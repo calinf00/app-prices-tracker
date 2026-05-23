@@ -58,12 +58,23 @@ export const scanReceipt = createServerFn({ method: "POST" })
     await enforceRateLimit(context.supabase, context.userId, "scanReceipt", 20, 24 * 3600_000);
     const client = getClient();
     const images = data.imagesBase64 ?? (data.imageBase64 ? [data.imageBase64] : []);
+    console.log("[scanReceipt] start, images count:", images.length);
+    for (const b64 of images) {
+      const sizeKB = Math.round((b64.length * 0.75) / 1024);
+      console.log(`[scanReceipt] immagine ${sizeKB}KB`);
+      if (sizeKB > 800) {
+        throw new Error(
+          `Immagine troppo grande (${sizeKB}KB). Riprova con una foto meno dettagliata o usa il ritaglio per selezionare solo lo scontrino.`,
+        );
+      }
+    }
     const promptText =
       images.length > 1
         ? "Queste immagini appartengono allo STESSO scontrino italiano (parti diverse o pagine multiple). Analizzale tutte insieme ed estrai un UNICO elenco prodotti, eliminando i duplicati. Restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }"
         : "Analizza questo scontrino italiano e restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }";
     let completion;
     try {
+      console.log("[scanReceipt] calling OpenAI...");
       completion = await client.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 4000,
@@ -87,9 +98,10 @@ export const scanReceipt = createServerFn({ method: "POST" })
             ],
           },
         ],
-      });
-    } catch (err) {
-      console.error("[scanReceipt] OpenAI API error:", err);
+      }, { timeout: 60000 });
+      console.log("[scanReceipt] OpenAI response received");
+    } catch (err: any) {
+      console.error("[scanReceipt] error:", err?.message, err?.status);
       throw new Error("Errore di connessione all'AI");
     }
     const raw = completion.choices[0]?.message?.content ?? "";
@@ -117,7 +129,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
       let isoDate: string | null = null;
       const m = (parsed.data ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m) isoDate = `${m[3]}-${m[2]}-${m[1]}`;
-      return {
+      const result = {
         store_name: parsed.negozio?.trim() || null,
         purchase_date: isoDate,
         total: Number(parsed.totale) || null,
@@ -131,6 +143,8 @@ export const scanReceipt = createServerFn({ method: "POST" })
           category: p.categoria_suggerita?.trim() || "Altro",
         })).filter((it) => it.name_full),
       };
+      console.log("[scanReceipt] parsed items:", result.items.length);
+      return result;
     } catch (err) {
       console.error("[scanReceipt] shape error:", err);
       throw new Error("L'AI non ha restituito un formato valido, riprova");
