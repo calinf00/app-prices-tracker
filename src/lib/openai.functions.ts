@@ -112,3 +112,115 @@ export const chatAssistant = createServerFn({ method: "POST" })
     });
     return { reply: completion.choices[0]?.message?.content ?? "" };
   });
+
+const estimateInput = z.object({
+  productName: z.string().min(1).max(200),
+});
+
+export const estimatePrice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => estimateInput.parse(input))
+  .handler(async ({ data }) => {
+    const client = getClient();
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "Sei un esperto di prezzi della grande distribuzione italiana. Per il prodotto fornito dall'utente, fornisci una stima della fascia di prezzo tipica nei supermercati italiani nel 2024-2025. Rispondi SOLO con un JSON: { prezzo_minimo: number, prezzo_massimo: number, unita: string }. Basa la risposta su prezzi realistici per supermercati come Esselunga, Conad, Coop, Lidl.",
+        },
+        { role: "user", content: data.productName },
+      ],
+    });
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        min: Number(parsed.prezzo_minimo) || 0,
+        max: Number(parsed.prezzo_massimo) || 0,
+        unit: String(parsed.unita ?? "pz"),
+      };
+    } catch {
+      return { min: 0, max: 0, unit: "pz" };
+    }
+  });
+
+const smartInput = z.object({
+  thresholdDays: z.number().min(1).max(180).default(14),
+});
+
+export const smartShoppingList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => smartInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const client = getClient();
+    const { supabase } = context;
+
+    const [{ data: purchases }, { data: products }, { data: listItems }] = await Promise.all([
+      supabase
+        .from("purchases")
+        .select("product_id, store_name, price, quantity, purchase_date")
+        .order("purchase_date", { ascending: false })
+        .limit(500),
+      supabase.from("products").select("id, name, category").limit(500),
+      supabase.from("shopping_list").select("product_name"),
+    ]);
+
+    const productsById = new Map((products ?? []).map((p: any) => [p.id, p]));
+    const inList = new Set(
+      (listItems ?? []).map((i: any) => String(i.product_name).toLowerCase().trim()),
+    );
+
+    const byProduct = new Map<string, { name: string; dates: string[] }>();
+    (purchases ?? []).forEach((p: any) => {
+      const prod = productsById.get(p.product_id);
+      if (!prod) return;
+      const entry = byProduct.get(p.product_id) ?? { name: String(prod.name), dates: [] as string[] };
+      entry.dates.push(String(p.purchase_date));
+      byProduct.set(p.product_id, entry);
+    });
+
+    const summary = Array.from(byProduct.values()).map((e) => {
+      const dates = e.dates.map((d) => new Date(d).getTime()).sort((a, b) => b - a);
+      const lastDays = dates[0] ? Math.round((Date.now() - dates[0]) / 86400000) : null;
+      const gaps: number[] = [];
+      for (let i = 0; i < dates.length - 1; i++) {
+        gaps.push(Math.round((dates[i] - dates[i + 1]) / 86400000));
+      }
+      const avgGap = gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null;
+      return {
+        nome: e.name,
+        acquisti: dates.length,
+        ultimo_giorni_fa: lastDays,
+        frequenza_media_giorni: avgGap,
+        in_lista: inList.has(e.name.toLowerCase().trim()),
+      };
+    });
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Sei un assistente che genera liste della spesa intelligenti basandosi sullo storico acquisti dell'utente. Soglia configurata: ${data.thresholdDays} giorni. Analizza i dati e suggerisci prodotti che: 1) sono acquistati con frequenza regolare e stanno per scadere il ciclo, 2) non sono stati comprati da più di ${data.thresholdDays} giorni, 3) sono frequenti ma non già in lista. Escludi prodotti già nella lista (in_lista: true). Rispondi SOLO con un JSON: { suggerimenti: [ { nome: string, motivo: string } ] }. Massimo 15 suggerimenti, ordinati per priorità.`,
+        },
+        { role: "user", content: JSON.stringify(summary).slice(0, 20000) },
+      ],
+    });
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    try {
+      const parsed = JSON.parse(raw);
+      const suggestions = ((parsed.suggerimenti ?? []) as any[])
+        .map((s) => ({
+          name: String(s?.nome ?? "").trim(),
+          reason: String(s?.motivo ?? "").trim(),
+        }))
+        .filter((s) => s.name);
+      return { suggestions };
+    } catch {
+      return { suggestions: [] };
+    }
+  });
