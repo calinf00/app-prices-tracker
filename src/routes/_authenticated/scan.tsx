@@ -33,8 +33,11 @@ import { scanReceipt } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
 import { compressImage, cropImageToFile, fileToBase64 } from "@/lib/image-compress";
-import { ReceiptCrop } from "@/components/receipt-crop";
-import type { PixelCrop } from "react-image-crop";
+import { lazy, Suspense } from "react";
+const ReceiptCrop = lazy(() =>
+  import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
+);
+type PixelCrop = { x: number; y: number; width: number; height: number };
 
 export const Route = createFileRoute("/_authenticated/scan")({
   component: ScanPage,
@@ -572,11 +575,13 @@ function ScanPage() {
   return (
     <div className="space-y-4 pb-8">
       {step === "crop" && preview && (
-        <ReceiptCrop
-          src={preview}
-          onCancel={resetAll}
-          onConfirm={handleCropConfirm}
-        />
+        <Suspense fallback={null}>
+          <ReceiptCrop
+            src={preview}
+            onCancel={resetAll}
+            onConfirm={handleCropConfirm}
+          />
+        </Suspense>
       )}
       <input
         ref={cameraRef}
