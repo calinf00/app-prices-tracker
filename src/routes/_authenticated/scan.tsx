@@ -369,7 +369,6 @@ function ScanPage() {
         }
         const purchasePayload: any = {
           product_id: productId,
-          user_id: uid,
           store_name: store.trim() || null,
           price: item.price,
           quantity: item.quantity || 1,
@@ -378,7 +377,7 @@ function ScanPage() {
           notes: "Importato da scontrino",
           receipt_group_id: groupId,
         };
-        if (receiptUrl) purchasePayload.receipt_url = receiptUrl;
+        if (receiptUrl) purchasePayload.receipt_image_url = receiptUrl;
         console.log("[scan.save] inserting purchase", purchasePayload);
         const { error: puErr } = await supabase
           .from("purchases")
