@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -55,6 +55,14 @@ type Item = {
 
 type Step = "capture" | "crop" | "preview" | "analyzing" | "review";
 
+type CapturedImage = {
+  file: File;        // compressed jpeg ready to upload
+  preview: string;   // data URL for thumbnail
+  base64: string;    // raw base64 for OpenAI
+};
+
+const MAX_IMAGES = 5;
+
 // Convert ISO YYYY-MM-DD to DD/MM/YYYY
 const isoToIt = (iso: string) => {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -71,9 +79,10 @@ function ScanPage() {
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("capture");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [base64, setBase64] = useState<string | null>(null);
+  const [images, setImages] = useState<CapturedImage[]>([]);
+  // The image currently being cropped (added to `images` on confirm).
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -95,19 +104,28 @@ function ScanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("store_name, purchase_date")
+        .select("store_name, purchase_date, receipt_group_id, id")
         .order("purchase_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      const groups = new Map<string, { store: string | null; date: string; count: number }>();
+      const groups = new Map<
+        string,
+        { key: string; groupId: string | null; store: string | null; date: string; count: number }
+      >();
       (data ?? []).forEach((r: any) => {
-        const key = `${r.purchase_date}|${r.store_name ?? ""}`;
-        const g = groups.get(key) ?? { store: r.store_name, date: r.purchase_date, count: 0 };
+        const key = r.receipt_group_id ?? `${r.purchase_date}|${r.store_name ?? ""}`;
+        const g = groups.get(key) ?? {
+          key,
+          groupId: r.receipt_group_id ?? null,
+          store: r.store_name,
+          date: r.purchase_date,
+          count: 0,
+        };
         g.count += 1;
         groups.set(key, g);
       });
-      return Array.from(groups.values()).slice(0, 5);
+      return Array.from(groups.values()).slice(0, 10);
     },
   });
 
@@ -136,12 +154,11 @@ function ScanPage() {
 
   const handleFile = (file: File) => {
     setError(null);
-    setImageFile(file);
+    setPendingFile(file);
     const r = new FileReader();
     r.onload = () => {
       const dataUrl = r.result as string;
-      setPreview(dataUrl);
-      setBase64(null);
+      setPendingPreview(dataUrl);
       setStep("crop");
     };
     r.readAsDataURL(file);
@@ -149,9 +166,9 @@ function ScanPage() {
 
   const resetAll = () => {
     setStep("capture");
-    setImageFile(null);
-    setPreview(null);
-    setBase64(null);
+    setImages([]);
+    setPendingFile(null);
+    setPendingPreview(null);
     setError(null);
     setItems([]);
     setStore("");
@@ -160,11 +177,16 @@ function ScanPage() {
     setDateDetected(true);
   };
 
-  const runAnalyze = async (b64: string) => {
+  const runAnalyze = async (imgs: CapturedImage[]) => {
     setStep("analyzing");
     setError(null);
     try {
-      const result = await scan({ data: { imageBase64: b64 } });
+      const result = await scan({
+        data:
+          imgs.length === 1
+            ? { imageBase64: imgs[0].base64 }
+            : { imagesBase64: imgs.map((i) => i.base64) },
+      });
       const detectedStore = result.store_name ?? "";
       setStore(detectedStore);
       setStoreDetected(!!detectedStore);
@@ -193,19 +215,8 @@ function ScanPage() {
   };
 
   const analyze = async () => {
-    if (base64) return runAnalyze(base64);
-    if (imageFile) {
-      try {
-        const compressed = await compressImage(imageFile);
-        setImageFile(compressed);
-        const b64 = await fileToBase64(compressed);
-        setBase64(b64);
-        return runAnalyze(b64);
-      } catch (e: any) {
-        setError(toUserMessage(e, "Errore preparazione immagine"));
-        setStep("preview");
-      }
-    }
+    if (images.length === 0) return;
+    return runAnalyze(images);
   };
 
   const handleCropConfirm = async (
@@ -216,27 +227,30 @@ function ScanPage() {
       let working: File;
       if (pixelCrop && pixelCrop.width > 0 && pixelCrop.height > 0) {
         working = await cropImageToFile(imageEl, pixelCrop);
-      } else if (imageFile) {
-        working = imageFile;
+      } else if (pendingFile) {
+        working = pendingFile;
       } else {
         return;
       }
       const compressed = await compressImage(working);
-      setImageFile(compressed);
       const dataUrl: string = await new Promise((resolve) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result as string);
         r.readAsDataURL(compressed);
       });
-      setPreview(dataUrl);
       const b64 = dataUrl.split(",")[1] ?? "";
-      setBase64(b64);
-      await runAnalyze(b64);
+      setImages((arr) => [...arr, { file: compressed, preview: dataUrl, base64: b64 }]);
+      setPendingFile(null);
+      setPendingPreview(null);
+      setStep("preview");
     } catch (e: any) {
       setError(toUserMessage(e, "Errore preparazione immagine"));
       setStep("preview");
     }
   };
+
+  const removeImage = (i: number) =>
+    setImages((arr) => arr.filter((_, idx) => idx !== i));
 
   const updateItem = (i: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
