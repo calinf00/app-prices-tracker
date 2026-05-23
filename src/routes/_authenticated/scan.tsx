@@ -32,6 +32,9 @@ import { toast } from "sonner";
 import { scanReceipt } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
+import { compressImage, cropImageToFile, fileToBase64 } from "@/lib/image-compress";
+import { ReceiptCrop } from "@/components/receipt-crop";
+import type { PixelCrop } from "react-image-crop";
 
 export const Route = createFileRoute("/_authenticated/scan")({
   component: ScanPage,
@@ -47,7 +50,7 @@ type Item = {
   selected: boolean;
 };
 
-type Step = "capture" | "preview" | "analyzing" | "review";
+type Step = "capture" | "crop" | "preview" | "analyzing" | "review";
 
 // Convert ISO YYYY-MM-DD to DD/MM/YYYY
 const isoToIt = (iso: string) => {
@@ -134,8 +137,8 @@ function ScanPage() {
     r.onload = () => {
       const dataUrl = r.result as string;
       setPreview(dataUrl);
-      setBase64(dataUrl.split(",")[1] ?? "");
-      setStep("preview");
+      setBase64(null);
+      setStep("crop");
     };
     r.readAsDataURL(file);
   };
@@ -153,12 +156,11 @@ function ScanPage() {
     setDateDetected(true);
   };
 
-  const analyze = async () => {
-    if (!base64) return;
+  const runAnalyze = async (b64: string) => {
     setStep("analyzing");
     setError(null);
     try {
-      const result = await scan({ data: { imageBase64: base64 } });
+      const result = await scan({ data: { imageBase64: b64 } });
       const detectedStore = result.store_name ?? "";
       setStore(detectedStore);
       setStoreDetected(!!detectedStore);
@@ -182,6 +184,52 @@ function ScanPage() {
       }
     } catch (e: any) {
       setError(toUserMessage(e, "Errore durante l'analisi dello scontrino"));
+      setStep("preview");
+    }
+  };
+
+  const analyze = async () => {
+    if (base64) return runAnalyze(base64);
+    if (imageFile) {
+      try {
+        const compressed = await compressImage(imageFile);
+        setImageFile(compressed);
+        const b64 = await fileToBase64(compressed);
+        setBase64(b64);
+        return runAnalyze(b64);
+      } catch (e: any) {
+        setError(toUserMessage(e, "Errore preparazione immagine"));
+        setStep("preview");
+      }
+    }
+  };
+
+  const handleCropConfirm = async (
+    pixelCrop: PixelCrop | null,
+    imageEl: HTMLImageElement,
+  ) => {
+    try {
+      let working: File;
+      if (pixelCrop && pixelCrop.width > 0 && pixelCrop.height > 0) {
+        working = await cropImageToFile(imageEl, pixelCrop);
+      } else if (imageFile) {
+        working = imageFile;
+      } else {
+        return;
+      }
+      const compressed = await compressImage(working);
+      setImageFile(compressed);
+      const dataUrl: string = await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.readAsDataURL(compressed);
+      });
+      setPreview(dataUrl);
+      const b64 = dataUrl.split(",")[1] ?? "";
+      setBase64(b64);
+      await runAnalyze(b64);
+    } catch (e: any) {
+      setError(toUserMessage(e, "Errore preparazione immagine"));
       setStep("preview");
     }
   };
@@ -523,6 +571,13 @@ function ScanPage() {
   // Capture / preview / analyzing
   return (
     <div className="space-y-4 pb-8">
+      {step === "crop" && preview && (
+        <ReceiptCrop
+          src={preview}
+          onCancel={resetAll}
+          onConfirm={handleCropConfirm}
+        />
+      )}
       <input
         ref={cameraRef}
         type="file"
