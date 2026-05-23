@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -383,6 +383,3 @@ function ScanPage() {
     </div>
   );
 }
-
-// Avoid unused-import warning on useEffect (kept for future enhancements).
-void useEffect;
