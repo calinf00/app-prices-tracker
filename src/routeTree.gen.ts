@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as ApiCheckMigrationRouteImport } from './routes/api/check-migration'
 import { Route as AuthenticatedShoppingListRouteImport } from './routes/_authenticated/shopping-list'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedScanRouteImport } from './routes/_authenticated/scan'
@@ -32,6 +33,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiCheckMigrationRoute = ApiCheckMigrationRouteImport.update({
+  id: '/api/check-migration',
+  path: '/api/check-migration',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedShoppingListRoute =
   AuthenticatedShoppingListRouteImport.update({
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/scan': typeof AuthenticatedScanRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
+  '/api/check-migration': typeof ApiCheckMigrationRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
 }
 export interface FileRoutesByTo {
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/scan': typeof AuthenticatedScanRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
+  '/api/check-migration': typeof ApiCheckMigrationRoute
   '/': typeof AuthenticatedIndexRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
 }
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/_authenticated/scan': typeof AuthenticatedScanRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping-list': typeof AuthenticatedShoppingListRoute
+  '/api/check-migration': typeof ApiCheckMigrationRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
 }
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/scan'
     | '/settings'
     | '/shopping-list'
+    | '/api/check-migration'
     | '/products/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/scan'
     | '/settings'
     | '/shopping-list'
+    | '/api/check-migration'
     | '/'
     | '/products/$id'
   id:
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/_authenticated/scan'
     | '/_authenticated/settings'
     | '/_authenticated/shopping-list'
+    | '/api/check-migration'
     | '/_authenticated/'
     | '/_authenticated/products/$id'
   fileRoutesById: FileRoutesById
@@ -134,6 +146,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiCheckMigrationRoute: typeof ApiCheckMigrationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/check-migration': {
+      id: '/api/check-migration'
+      path: '/api/check-migration'
+      fullPath: '/api/check-migration'
+      preLoaderRoute: typeof ApiCheckMigrationRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/shopping-list': {
       id: '/_authenticated/shopping-list'
@@ -242,7 +262,18 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiCheckMigrationRoute: ApiCheckMigrationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
