@@ -213,12 +213,13 @@ export const smartShoppingList = createServerFn({ method: "POST" })
     const raw = completion.choices[0]?.message?.content ?? "{}";
     try {
       const parsed = JSON.parse(raw);
-      return {
-        suggestions: (parsed.suggerimenti ?? []).map((s: any) => ({
-          name: String(s.nome ?? "").trim(),
-          reason: String(s.motivo ?? "").trim(),
-        })).filter((s: any) => s.name),
-      };
+      const suggestions = ((parsed.suggerimenti ?? []) as any[])
+        .map((s) => ({
+          name: String(s?.nome ?? "").trim(),
+          reason: String(s?.motivo ?? "").trim(),
+        }))
+        .filter((s) => s.name);
+      return { suggestions };
     } catch {
       return { suggestions: [] };
     }
