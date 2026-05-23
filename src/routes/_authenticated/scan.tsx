@@ -334,9 +334,13 @@ function ScanPage() {
       for (const [idx, item] of selected.entries()) {
         const cleanName = item.name_full.trim();
         console.log(`[scan.save] (${idx + 1}/${selected.length}) lookup`, cleanName);
+        const { data: userData2 } = await supabase.auth.getUser();
+        const uid = userData2.user?.id;
+        if (!uid) throw new Error("Sessione scaduta, effettua di nuovo l'accesso");
         const { data: matches } = await supabase
           .from("products")
           .select("id, name")
+          .eq("user_id", uid)
           .ilike("name", cleanName)
           .limit(1);
         let productId = matches?.[0]?.id;
@@ -344,17 +348,29 @@ function ScanPage() {
           console.log("[scan.save] creating product", cleanName);
           const { data: created, error: pErr } = await supabase
             .from("products")
-            .insert({ name: cleanName, category: item.category })
+            .insert({ name: cleanName, category: item.category, user_id: uid })
             .select("id")
             .single();
           if (pErr) {
             console.error("[scan.save] product insert error", pErr);
-            throw pErr;
+            // Possible duplicate (unique on name) — retry lookup without user filter
+            const { data: retry } = await supabase
+              .from("products")
+              .select("id")
+              .ilike("name", cleanName)
+              .limit(1);
+            if (retry?.[0]?.id) {
+              productId = retry[0].id;
+            } else {
+              throw new Error(`Prodotto "${cleanName}": ${pErr.message}`);
+            }
+          } else {
+            productId = created.id;
           }
-          productId = created.id;
         }
         const purchasePayload: any = {
           product_id: productId,
+          user_id: uid,
           store_name: store.trim() || null,
           price: item.price,
           quantity: item.quantity || 1,
@@ -370,7 +386,7 @@ function ScanPage() {
           .insert(purchasePayload);
         if (puErr) {
           console.error("[scan.save] purchase insert error", puErr);
-          throw puErr;
+          throw new Error(`Acquisto "${cleanName}": ${puErr.message}`);
         }
       }
       toast.success(`✅ ${selected.length} prodotti salvati con successo`);
