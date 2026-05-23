@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -388,7 +388,7 @@ function PurchaseDialog({
   const [saving, setSaving] = useState(false);
 
   // Sync when dialog opens
-  useMemo(() => {
+  useEffect(() => {
     if (open) {
       setStore(purchase?.store_name ?? "");
       setPrice(purchase ? String(purchase.price) : "");
