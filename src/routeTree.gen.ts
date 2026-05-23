@@ -20,7 +20,6 @@ import { Route as AuthenticatedAssistantRouteImport } from './routes/_authentica
 import { Route as AuthenticatedScanGroupIdRouteImport } from './routes/_authenticated/scan.$groupId'
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
-import { Route as AuthenticatedScanRouteImport } from './routes/_authenticated/scan.'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -79,11 +78,6 @@ const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedProductsRoute,
 } as any)
-const AuthenticatedScanRoute = AuthenticatedScanRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedScanRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -93,7 +87,6 @@ export interface FileRoutesByFullPath {
   '/scan': typeof AuthenticatedScanRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
-  '/scan/': typeof AuthenticatedScanRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
@@ -102,10 +95,10 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/assistant': typeof AuthenticatedAssistantRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
+  '/scan': typeof AuthenticatedScanRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
   '/': typeof AuthenticatedIndexRoute
-  '/scan': typeof AuthenticatedScanRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
@@ -120,7 +113,6 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping-list': typeof AuthenticatedShoppingListRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/scan/': typeof AuthenticatedScanRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
@@ -135,7 +127,6 @@ export interface FileRouteTypes {
     | '/scan'
     | '/settings'
     | '/shopping-list'
-    | '/scan/'
     | '/products/$id'
     | '/products/new'
     | '/scan/$groupId'
@@ -144,10 +135,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/assistant'
     | '/products'
+    | '/scan'
     | '/settings'
     | '/shopping-list'
     | '/'
-    | '/scan'
     | '/products/$id'
     | '/products/new'
     | '/scan/$groupId'
@@ -161,7 +152,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/shopping-list'
     | '/_authenticated/'
-    | '/_authenticated/scan/'
     | '/_authenticated/products/$id'
     | '/_authenticated/products/new'
     | '/_authenticated/scan/$groupId'
@@ -251,13 +241,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIdRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
-    '/_authenticated/scan/': {
-      id: '/_authenticated/scan/'
-      path: '/'
-      fullPath: '/scan/'
-      preLoaderRoute: typeof AuthenticatedScanRouteImport
-      parentRoute: typeof AuthenticatedScanRoute
-    }
   }
 }
 
@@ -277,12 +260,10 @@ const AuthenticatedProductsRouteWithChildren =
   )
 
 interface AuthenticatedScanRouteChildren {
-  AuthenticatedScanRoute: typeof AuthenticatedScanRoute
   AuthenticatedScanGroupIdRoute: typeof AuthenticatedScanGroupIdRoute
 }
 
 const AuthenticatedScanRouteChildren: AuthenticatedScanRouteChildren = {
-  AuthenticatedScanRoute: AuthenticatedScanRoute,
   AuthenticatedScanGroupIdRoute: AuthenticatedScanGroupIdRoute,
 }
 
@@ -318,3 +299,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
