@@ -7,9 +7,9 @@
  */
 export async function compressImage(
   file: File | Blob,
-  maxWidth = 1600,
-  initialQuality = 0.82,
-  maxBytes = 1.2 * 1024 * 1024,
+  maxWidth = 1920,
+  initialQuality = 0.85,
+  maxBytes = 1.5 * 1024 * 1024,
 ): Promise<File> {
   const originalSize = file.size;
   const originalType = (file as File).type || "image/jpeg";
@@ -43,18 +43,23 @@ export async function compressImage(
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas non disponibile");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   // White background in case of transparency (PNG)
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
+  ctx.filter = "contrast(1.08) brightness(1.03)";
   ctx.drawImage(img, 0, 0, w, h);
+  ctx.filter = "none";
 
   let quality = initialQuality;
   let blob: Blob | null = await new Promise((resolve) =>
     canvas.toBlob((b) => resolve(b), "image/jpeg", quality),
   );
-  // Step quality down if still too big
-  while (blob && blob.size > maxBytes && quality > 0.5) {
-    quality -= 0.1;
+  // Step quality down only moderately: receipt text becomes unreadable if we go too low.
+  const minReadableQuality = 0.72;
+  while (blob && blob.size > maxBytes && quality > minReadableQuality) {
+    quality = Math.max(minReadableQuality, quality - 0.06);
     blob = await new Promise((resolve) =>
       canvas.toBlob((b) => resolve(b), "image/jpeg", quality),
     );
