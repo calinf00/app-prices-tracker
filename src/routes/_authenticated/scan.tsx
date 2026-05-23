@@ -100,8 +100,6 @@ function ScanPage() {
   const scan = useServerFn(scanReceipt);
   const qc = useQueryClient();
 
-  if (location.pathname !== "/scan") return <Outlet />;
-
   // Recent scans (history)
   const recent = useQuery({
     queryKey: ["recent-scans"],
@@ -154,6 +152,8 @@ function ScanPage() {
       .filter((s) => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
       .slice(0, 5);
   }, [store, knownStores.data]);
+
+  if (location.pathname !== "/scan") return <Outlet />;
 
   const handleFile = (file: File) => {
     setError(null);
