@@ -25,7 +25,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
         {
           role: "system",
           content:
-            "Sei un assistente che analizza scontrini italiani. Restituisci un JSON con la struttura: {\"store_name\": string|null, \"purchase_date\": string YYYY-MM-DD|null, \"items\": [{\"name\": string, \"quantity\": number, \"unit\": string|null, \"price\": number}]}. I prezzi sono in euro. Se non riesci a leggere lo scontrino restituisci items vuoto.",
+            "Sei un assistente specializzato nell'analisi di scontrini italiani. Analizza l'immagine e restituisci ESCLUSIVAMENTE un JSON valido (senza markdown, senza testo aggiuntivo) con questa struttura: { \"negozio\": string, \"data\": string (formato DD/MM/YYYY o vuota se non visibile), \"prodotti\": [ { \"nome\": string, \"quantita\": number, \"unita\": string, \"prezzo_unitario\": number, \"prezzo_totale\": number } ] }",
         },
         {
           role: "user",
@@ -38,10 +38,30 @@ export const scanReceipt = createServerFn({ method: "POST" })
     });
     const raw = completion.choices[0]?.message?.content ?? "{}";
     try {
-      return JSON.parse(raw) as {
-        store_name: string | null;
-        purchase_date: string | null;
-        items: Array<{ name: string; quantity: number; unit: string | null; price: number }>;
+      const parsed = JSON.parse(raw) as {
+        negozio?: string;
+        data?: string;
+        prodotti?: Array<{
+          nome?: string;
+          quantita?: number;
+          unita?: string;
+          prezzo_unitario?: number;
+          prezzo_totale?: number;
+        }>;
+      };
+      // Convert DD/MM/YYYY -> YYYY-MM-DD for DB compatibility
+      let isoDate: string | null = null;
+      const m = (parsed.data ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m) isoDate = `${m[3]}-${m[2]}-${m[1]}`;
+      return {
+        store_name: parsed.negozio?.trim() || null,
+        purchase_date: isoDate,
+        items: (parsed.prodotti ?? []).map((p) => ({
+          name: (p.nome ?? "").trim(),
+          quantity: Number(p.quantita) || 1,
+          unit: p.unita?.trim() || null,
+          price: Number(p.prezzo_unitario ?? p.prezzo_totale) || 0,
+        })).filter((it) => it.name),
       };
     } catch {
       return { store_name: null, purchase_date: null, items: [] };
