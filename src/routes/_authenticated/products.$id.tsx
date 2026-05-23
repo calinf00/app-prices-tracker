@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -42,7 +42,7 @@ import {
   YAxis,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { categoryMeta, STORE_COLORS, UNITS } from "@/lib/categories";
+import { categoryMeta, CATEGORIES, STORE_COLORS, UNITS } from "@/lib/categories";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   component: ProductDetailPage,
@@ -68,9 +68,12 @@ type ProductRow = {
 
 function ProductDetailPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Purchase | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editProductOpen, setEditProductOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -107,6 +110,26 @@ function ProductDetailPage() {
       toast.success("Acquisto eliminato");
     },
     onError: (e: any) => toast.error(toUserMessage(e, "Errore")),
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: async () => {
+      // Delete purchases first to avoid FK constraint issues.
+      const { error: e1 } = await supabase
+        .from("purchases")
+        .delete()
+        .eq("product_id", id);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("products").delete().eq("id", id);
+      if (e2) throw e2;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+      qc.invalidateQueries({ queryKey: ["recent-scans"] });
+      toast.success("Prodotto eliminato");
+      navigate({ to: "/products" });
+    },
+    onError: (e: any) => toast.error(toUserMessage(e, "Errore eliminazione")),
   });
 
   const stats = useMemo(() => {
@@ -201,6 +224,13 @@ function ProductDetailPage() {
             {[p.brand, p.category].filter(Boolean).join(" · ") || "—"}
           </p>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setEditProductOpen(true)}
+        >
+          <Pencil className="h-4 w-4 mr-1" /> Modifica
+        </Button>
       </Card>
 
       {chartData.length > 0 && (
@@ -367,6 +397,53 @@ function ProductDetailPage() {
           qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
         }}
       />
+
+      <ProductEditDialog
+        open={editProductOpen}
+        onOpenChange={setEditProductOpen}
+        product={p}
+        onSaved={() => {
+          setEditProductOpen(false);
+          qc.invalidateQueries({ queryKey: ["product", id] });
+          qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+        }}
+      />
+
+      <div className="pt-6">
+        <Button
+          variant="outline"
+          className="w-full text-destructive border-destructive/40 hover:bg-destructive/10"
+          onClick={() => setConfirmDelete(true)}
+        >
+          <Trash2 className="h-4 w-4 mr-2" /> Elimina prodotto
+        </Button>
+      </div>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminare il prodotto?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Eliminando questo prodotto verranno eliminati anche tutti i{" "}
+            <b>{data.purchases.length}</b> acquisti associati. Continuare?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>
+              Annulla
+            </Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setConfirmDelete(false);
+                deleteProduct.mutate();
+              }}
+            >
+              Elimina
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -501,6 +578,99 @@ function PurchaseDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
           <Button onClick={save} disabled={saving}>{isEdit ? "Salva" : "Aggiungi"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProductEditDialog({
+  open,
+  onOpenChange,
+  product,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  product: ProductRow;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(product.name);
+  const [brand, setBrand] = useState(product.brand ?? "");
+  const [category, setCategory] = useState<string>(product.category ?? "Altro");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName(product.name);
+      setBrand(product.brand ?? "");
+      setCategory(product.category ?? "Altro");
+    }
+  }, [open, product]);
+
+  const save = async () => {
+    if (!name.trim()) {
+      toast.error("Inserisci il nome");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update({
+          name: name.trim(),
+          brand: brand.trim() || null,
+          category,
+        })
+        .eq("id", product.id);
+      if (error) throw error;
+      toast.success("Prodotto aggiornato ✅");
+      onSaved();
+    } catch (e: any) {
+      toast.error(toUserMessage(e, "Errore salvataggio"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Modifica prodotto</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Nome</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Brand</Label>
+            <Input value={brand} onChange={(e) => setBrand(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Categoria</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Annulla
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            💾 Salva
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
