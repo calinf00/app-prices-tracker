@@ -159,8 +159,16 @@ function ProductDetailPage() {
         map.set(k, p);
       }
     });
+    const list = data?.purchases ?? [];
+    const avg = list.length
+      ? list.reduce((s, p) => s + p.price, 0) / list.length
+      : 0;
     return Array.from(map.entries())
-      .map(([store, p]) => ({ store, ...p }))
+      .map(([store, p]) => ({
+        store,
+        ...p,
+        variance: avg ? ((p.price - avg) / avg) * 100 : 0,
+      }))
       .sort((a, b) => a.price - b.price);
   }, [data]);
 
@@ -249,6 +257,11 @@ function ProductDetailPage() {
             value={`€${stats.last.price.toFixed(2)}`}
             sub={`${stats.last.store_name ?? "—"} · ${fmtDate(stats.last.purchase_date)}`}
           />
+          <StatCard
+            label="Acquisti totali"
+            value={`${data.purchases.length}`}
+            sub={data.purchases.length === 1 ? "registrato" : "registrati"}
+          />
         </div>
       )}
 
@@ -261,6 +274,7 @@ function ProductDetailPage() {
                 <TableHead>Negozio</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead className="text-right">Prezzo</TableHead>
+                <TableHead className="text-right">vs media</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -272,6 +286,15 @@ function ProductDetailPage() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{fmtDate(s.purchase_date)}</TableCell>
                   <TableCell className="text-right font-semibold">€{s.price.toFixed(2)}</TableCell>
+                  <TableCell
+                    className={`text-right text-xs ${
+                      s.variance < 0 ? "text-emerald-600" : s.variance > 0 ? "text-destructive" : "text-muted-foreground"
+                    }`}
+                  >
+                    {s.variance === 0
+                      ? "—"
+                      : `${s.variance > 0 ? "+" : ""}${s.variance.toFixed(1)}%`}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
