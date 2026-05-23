@@ -16,6 +16,9 @@ const SAFE_AUTH_FRAGMENTS = [
 const SAFE_AI_MESSAGES = [
   "Errore di connessione all'AI",
   "L'AI non ha restituito un formato valido, riprova",
+  "Almeno un'immagine richiesta",
+  "Formato immagine non valido",
+  "Immagine troppo grande. Ritaglia solo lo scontrino e riprova.",
   "Immagine non leggibile, prova con una foto più nitida",
   "Nessun prodotto trovato nello scontrino",
 ];
