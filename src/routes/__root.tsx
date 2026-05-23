@@ -81,6 +81,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Tieni traccia dei prezzi della spesa, scansiona scontrini e gestisci la lista." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "App Prezzi" },
+      { name: "twitter:description", content: "Tieni traccia dei prezzi della spesa, scansiona scontrini e gestisci la lista." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2f662d82-06bf-4eac-8067-66724aa95cc4/id-preview-03885651--c638ccb4-3141-4a1a-a786-ff55184154a5.lovable.app-1779568981163.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2f662d82-06bf-4eac-8067-66724aa95cc4/id-preview-03885651--c638ccb4-3141-4a1a-a786-ff55184154a5.lovable.app-1779568981163.png" },
     ],
     links: [
       {
