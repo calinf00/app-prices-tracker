@@ -16,6 +16,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/user-errors";
+import { decodeReceiptKey, encodeReceiptKey } from "@/lib/receipt-key";
+import { UNITS } from "@/lib/categories";
 
 export const Route = createFileRoute("/_authenticated/scan/$groupId")({
   component: ReceiptDetailPage,
@@ -43,48 +53,42 @@ type PurchaseRow = {
   products: { name: string } | null;
 };
 
+type ReceiptKey = { store: string | null; date: string };
+
+function applyReceiptFilter(query: any, key: ReceiptKey) {
+  const filtered = query.eq("purchase_date", key.date);
+  return key.store ? filtered.eq("store_name", key.store) : filtered.is("store_name", null);
+}
+
 function ReceiptDetailPage() {
   const { groupId } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const receiptKey = useMemo(() => decodeReceiptKey(groupId), [groupId]);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [editingOpen, setEditingOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<PurchaseRow | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["receipt-group", groupId],
     queryFn: async () => {
-      const [{ data: purchases, error: e1 }, { data: imgs, error: e2 }] =
-        await Promise.all([
-          supabase
-            .from("purchases")
-            .select(
-              "id, product_id, store_name, price, quantity, unit, purchase_date, notes, products(name)",
-            )
-            .eq("receipt_group_id", groupId)
-            .order("created_at", { ascending: true }),
-          supabase
-            .from("receipt_images")
-            .select("id, storage_path, position")
-            .eq("receipt_group_id", groupId)
-            .order("position", { ascending: true }),
-        ]);
-      if (e1) throw e1;
-      if (e2) throw e2;
+      if (!receiptKey.date) return { purchases: [] as PurchaseRow[], images: [] as { url: string; path: string }[] };
 
-      // Sign storage paths so the images render.
-      const signed: { url: string; path: string }[] = [];
-      for (const img of imgs ?? []) {
-        const { data: s } = await supabase.storage
-          .from("receipts")
-          .createSignedUrl(img.storage_path, 3600);
-        if (s?.signedUrl) signed.push({ url: s.signedUrl, path: img.storage_path });
-      }
+      const { data: purchases, error } = await applyReceiptFilter(
+        supabase
+          .from("purchases")
+          .select("id, product_id, store_name, price, quantity, unit, purchase_date, notes, products(name)")
+          .order("created_at", { ascending: true }),
+        receiptKey,
+      );
+      if (error) throw error;
+
       return {
         purchases: ((purchases ?? []) as unknown as PurchaseRow[]).map((p) => ({
           ...p,
           price: Number(p.price),
         })),
-        images: signed,
+        images: [] as { url: string; path: string }[],
       };
     },
   });
@@ -101,30 +105,38 @@ function ReceiptDetailPage() {
   const header = useMemo(() => {
     const first = data?.purchases?.[0];
     return {
-      store: first?.store_name ?? "—",
-      date: first?.purchase_date ?? "",
+      store: first?.store_name ?? receiptKey.store ?? "—",
+      date: first?.purchase_date ?? receiptKey.date,
     };
-  }, [data]);
+  }, [data, receiptKey]);
 
   const deleteAll = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("purchases")
-        .delete()
-        .eq("receipt_group_id", groupId);
+      const { error } = await applyReceiptFilter(
+        supabase.from("purchases").delete(),
+        receiptKey,
+      );
       if (error) throw error;
-      // Best-effort cleanup of images.
-      const paths = data?.images.map((i) => i.path) ?? [];
-      if (paths.length) {
-        await supabase.storage.from("receipts").remove(paths);
-      }
-      await supabase.from("receipt_images").delete().eq("receipt_group_id", groupId);
     },
     onSuccess: () => {
       toast.success("Scontrino eliminato");
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       navigate({ to: "/scan" });
+    },
+    onError: (e: any) => toast.error(toUserMessage(e, "Errore eliminazione")),
+  });
+
+  const deletePurchase = useMutation({
+    mutationFn: async (purchaseId: string) => {
+      const { error } = await supabase.from("purchases").delete().eq("id", purchaseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Riga eliminata");
+      qc.invalidateQueries({ queryKey: ["receipt-group", groupId] });
+      qc.invalidateQueries({ queryKey: ["recent-scans"] });
+      qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
     },
     onError: (e: any) => toast.error(toUserMessage(e, "Errore eliminazione")),
   });
@@ -155,7 +167,6 @@ function ReceiptDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Scansioni
       </Link>
 
-      {/* Header */}
       <Card className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -185,7 +196,7 @@ function ReceiptDetailPage() {
             className="flex-1"
             onClick={() => setEditingOpen(true)}
           >
-            <Pencil className="h-4 w-4 mr-1" /> Modifica
+            <Pencil className="h-4 w-4 mr-1" /> Modifica scontrino
           </Button>
           <Button
             size="sm"
@@ -201,7 +212,6 @@ function ReceiptDetailPage() {
         </div>
       </Card>
 
-      {/* Images gallery */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1">
           Immagini scontrino
@@ -231,41 +241,55 @@ function ReceiptDetailPage() {
         )}
       </div>
 
-      {/* Products list */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1">
           Prodotti ({data.purchases.length})
         </h3>
         <div className="space-y-2">
           {data.purchases.map((p) => (
-            <Link
-              key={p.id}
-              to="/products/$id"
-              params={{ id: p.product_id }}
-            >
-              <Card className="p-3 hover:border-primary/40 transition-colors">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">
-                      {p.products?.name ?? "—"}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.quantity ?? 1} {p.unit ?? "pz"} × €{Number(p.price).toFixed(2)}
-                    </div>
+            <Card key={p.id} className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Link
+                  to="/products/$id"
+                  params={{ id: p.product_id }}
+                  className="min-w-0 flex-1"
+                >
+                  <div className="font-medium truncate">
+                    {p.products?.name ?? "—"}
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-semibold">
-                      €{(Number(p.price) * (p.quantity ?? 1)).toFixed(2)}
-                    </div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.quantity ?? 1} {p.unit ?? "pz"} × €{Number(p.price).toFixed(2)}
                   </div>
+                </Link>
+                <div className="flex items-center gap-1 shrink-0">
+                  <div className="font-semibold px-1">
+                    €{(Number(p.price) * (p.quantity ?? 1)).toFixed(2)}
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setEditingPurchase(p)}
+                    aria-label="Modifica riga"
+                  >
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      if (confirm("Eliminare questo prodotto dallo scontrino?")) deletePurchase.mutate(p.id);
+                    }}
+                    aria-label="Elimina riga"
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
-              </Card>
-            </Link>
+              </div>
+            </Card>
           ))}
         </div>
       </div>
 
-      {/* Fullscreen image zoom */}
       <Dialog open={!!zoomUrl} onOpenChange={(o) => !o && setZoomUrl(null)}>
         <DialogContent className="max-w-4xl p-2">
           {zoomUrl && (
@@ -284,12 +308,25 @@ function ReceiptDetailPage() {
       <EditHeaderDialog
         open={editingOpen}
         onOpenChange={setEditingOpen}
-        groupId={groupId}
+        receiptKey={receiptKey}
         currentStore={header.store === "—" ? "" : header.store}
         currentDate={header.date}
-        onSaved={() => {
-          qc.invalidateQueries({ queryKey: ["receipt-group", groupId] });
+        onSaved={(next) => {
           qc.invalidateQueries({ queryKey: ["recent-scans"] });
+          qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+          navigate({ to: "/scan/$groupId", params: { groupId: encodeReceiptKey(next.store, next.date) } });
+        }}
+      />
+
+      <PurchaseEditDialog
+        purchase={editingPurchase}
+        onOpenChange={(open) => !open && setEditingPurchase(null)}
+        onSaved={(productId) => {
+          setEditingPurchase(null);
+          qc.invalidateQueries({ queryKey: ["receipt-group", groupId] });
+          qc.invalidateQueries({ queryKey: ["product", productId] });
+          qc.invalidateQueries({ queryKey: ["recent-scans"] });
+          qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
         }}
       />
     </div>
@@ -299,17 +336,17 @@ function ReceiptDetailPage() {
 function EditHeaderDialog({
   open,
   onOpenChange,
-  groupId,
+  receiptKey,
   currentStore,
   currentDate,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  groupId: string;
+  receiptKey: ReceiptKey;
   currentStore: string;
   currentDate: string;
-  onSaved: () => void;
+  onSaved: (next: ReceiptKey) => void;
 }) {
   const [store, setStore] = useState(currentStore);
   const [date, setDate] = useState(currentDate);
@@ -323,18 +360,23 @@ function EditHeaderDialog({
   }, [open, currentStore, currentDate]);
 
   const save = async () => {
+    if (!date) {
+      toast.error("Inserisci la data");
+      return;
+    }
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("purchases")
-        .update({
-          store_name: store.trim() || null,
-          purchase_date: date,
-        })
-        .eq("receipt_group_id", groupId);
+      const next = { store: store.trim() || null, date };
+      const { error } = await applyReceiptFilter(
+        supabase.from("purchases").update({
+          store_name: next.store,
+          purchase_date: next.date,
+        }),
+        receiptKey,
+      );
       if (error) throw error;
       toast.success("Scontrino aggiornato");
-      onSaved();
+      onSaved(next);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(toUserMessage(e, "Errore aggiornamento"));
@@ -361,6 +403,134 @@ function EditHeaderDialog({
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Annulla
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            Salva
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PurchaseEditDialog({
+  purchase,
+  onOpenChange,
+  onSaved,
+}: {
+  purchase: PurchaseRow | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: (productId: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [store, setStore] = useState("");
+  const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [unit, setUnit] = useState("pz");
+  const [date, setDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (purchase) {
+      setName(purchase.products?.name ?? "");
+      setStore(purchase.store_name ?? "");
+      setPrice(String(purchase.price));
+      setQuantity(String(purchase.quantity ?? 1));
+      setUnit(purchase.unit ?? "pz");
+      setDate(purchase.purchase_date);
+      setNotes(purchase.notes ?? "");
+    }
+  }, [purchase]);
+
+  const save = async () => {
+    if (!purchase) return;
+    if (!name.trim() || !price || !date) {
+      toast.error("Compila nome, prezzo e data");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error: productError } = await supabase
+        .from("products")
+        .update({ name: name.trim() })
+        .eq("id", purchase.product_id);
+      if (productError) throw productError;
+
+      const { error: purchaseError } = await supabase
+        .from("purchases")
+        .update({
+          store_name: store.trim() || null,
+          price: Number(price),
+          quantity: Number(quantity) || 1,
+          unit,
+          purchase_date: date,
+          notes: notes.trim() || null,
+        })
+        .eq("id", purchase.id);
+      if (purchaseError) throw purchaseError;
+
+      toast.success("Prodotto dello scontrino aggiornato");
+      onSaved(purchase.product_id);
+    } catch (e: any) {
+      toast.error(toUserMessage(e, "Errore salvataggio"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!purchase} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Modifica prodotto scontrino</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Nome prodotto</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Negozio</Label>
+            <Input value={store} onChange={(e) => setStore(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Prezzo</Label>
+              <Input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Data</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Quantità</Label>
+              <Input type="number" step="0.1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Unità</Label>
+              <Select value={unit} onValueChange={setUnit}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNITS.map((u) => (
+                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Note</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
         </div>
         <DialogFooter>
