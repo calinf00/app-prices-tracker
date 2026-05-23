@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import OpenAI from "openai";
+import { Buffer } from "node:buffer";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 function getClient() {
@@ -52,6 +53,22 @@ const scanInput = z
   .refine((v) => !!v.imageBase64 || (v.imagesBase64 && v.imagesBase64.length > 0), {
     message: "Almeno un'immagine richiesta",
   });
+
+function validateScanFormData(input: unknown) {
+  if (!(input instanceof FormData)) throw new Error("Almeno un'immagine richiesta");
+  const files = input
+    .getAll("images")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0)
+    .slice(0, 5);
+  if (files.length === 0) throw new Error("Almeno un'immagine richiesta");
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) throw new Error("Formato immagine non valido");
+    if (file.size > 2.2 * 1024 * 1024) {
+      throw new Error("Immagine troppo grande. Ritaglia solo lo scontrino e riprova.");
+    }
+  }
+  return { files };
+}
 
 type ReceiptAIResponse = {
   negozio?: string;
