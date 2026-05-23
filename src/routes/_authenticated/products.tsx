@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Search, Plus } from "lucide-react";
@@ -32,10 +32,13 @@ type SortKey = "name" | "recent" | "price-asc" | "price-desc";
 
 function ProductsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const [store, setStore] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("name");
+
+  if (location.pathname !== "/products") return <Outlet />;
 
   const { data, isLoading } = useQuery({
     queryKey: ["products-with-purchases"],
