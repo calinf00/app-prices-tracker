@@ -92,6 +92,7 @@ function ScanPage() {
   const [dateDetected, setDateDetected] = useState(true);
   const [items, setItems] = useState<Item[]>([]);
   const [zoom, setZoom] = useState(false);
+  const [zoomIdx, setZoomIdx] = useState(0);
   const [storeSuggestOpen, setStoreSuggestOpen] = useState(false);
   const [storeError, setStoreError] = useState(false);
 
@@ -475,22 +476,30 @@ function ScanPage() {
               )}
             </div>
 
-            {/* Thumbnail */}
-            {preview && (
-              <button
-                type="button"
-                onClick={() => setZoom(true)}
-                className="relative block rounded-md overflow-hidden border bg-muted h-20 w-full"
-              >
-                <img
-                  src={preview}
-                  alt="scontrino"
-                  className="h-full w-full object-cover opacity-80"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-xs gap-1">
-                  <ZoomIn className="h-4 w-4" /> Tocca per ingrandire
-                </div>
-              </button>
+            {/* Thumbnails strip */}
+            {images.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setZoomIdx(i);
+                      setZoom(true);
+                    }}
+                    className="relative shrink-0 rounded-md overflow-hidden border bg-muted h-20 w-20"
+                  >
+                    <img
+                      src={img.preview}
+                      alt={`scontrino ${i + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1">
+                      {i + 1}/{images.length}
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -631,8 +640,12 @@ function ScanPage() {
         {/* Zoom dialog */}
         <Dialog open={zoom} onOpenChange={setZoom}>
           <DialogContent className="max-w-3xl p-2">
-            {preview && (
-              <img src={preview} alt="scontrino" className="w-full h-auto rounded" />
+            {images[zoomIdx] && (
+              <img
+                src={images[zoomIdx].preview}
+                alt="scontrino"
+                className="w-full h-auto rounded"
+              />
             )}
           </DialogContent>
         </Dialog>
@@ -643,10 +656,10 @@ function ScanPage() {
   // Capture / preview / analyzing
   return (
     <div className="space-y-4 pb-8">
-      {step === "crop" && preview && (
+      {step === "crop" && pendingPreview && (
         <Suspense fallback={null}>
           <ReceiptCrop
-            src={preview}
+            src={pendingPreview}
             onCancel={resetAll}
             onConfirm={handleCropConfirm}
           />
@@ -698,13 +711,50 @@ function ScanPage() {
         </div>
       )}
 
-      {(step === "preview" || step === "analyzing") && preview && (
+      {(step === "preview" || step === "analyzing") && images.length > 0 && (
         <Card className="p-3 space-y-3">
-          <img
-            src={preview}
-            alt="scontrino"
-            className="w-full max-h-80 object-contain rounded-md bg-muted"
-          />
+          {/* Thumbnails of all captured images */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {images.map((img, i) => (
+              <div
+                key={i}
+                className="relative shrink-0 rounded-md overflow-hidden border bg-muted h-28 w-28"
+              >
+                <img
+                  src={img.preview}
+                  alt={`pag ${i + 1}`}
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  className="absolute top-1 right-1 rounded-full bg-black/70 text-white p-1"
+                  aria-label="Rimuovi"
+                  disabled={step === "analyzing"}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-0.5">
+                  {i + 1}/{images.length}
+                </div>
+              </div>
+            ))}
+            {images.length < MAX_IMAGES && step !== "analyzing" && (
+              <button
+                type="button"
+                onClick={() => galleryRef.current?.click()}
+                className="shrink-0 rounded-md border border-dashed h-28 w-28 grid place-items-center text-xs text-muted-foreground hover:bg-muted/50"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <Plus className="h-5 w-5" />
+                  Aggiungi foto
+                </div>
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground text-center">
+            {images.length}/{MAX_IMAGES} foto · puoi aggiungere più foto per scontrini lunghi
+          </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -712,7 +762,7 @@ function ScanPage() {
               onClick={resetAll}
               disabled={step === "analyzing"}
             >
-              <RefreshCw className="h-4 w-4 mr-2" /> Rifare foto
+              <RefreshCw className="h-4 w-4 mr-2" /> Annulla
             </Button>
             <Button
               className="flex-1 h-11"
