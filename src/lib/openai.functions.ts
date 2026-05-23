@@ -54,27 +54,47 @@ export const scanReceipt = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await enforceRateLimit(context.supabase, context.userId, "scanReceipt", 20, 24 * 3600_000);
     const client = getClient();
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "Sei un esperto nell'analisi di scontrini italiani. Il tuo compito è estrarre le informazioni dallo scontrino e restituire ESCLUSIVAMENTE un JSON valido senza markdown. Per i nomi dei prodotti: espandi le abbreviazioni comuni degli scontrini italiani nel nome completo e comprensibile (es. 'PAST.BARILLA SPG 500' diventa 'Pasta Barilla Spaghetti 500g', 'LATT.PARMALAT PS' diventa 'Latte Parmalat Parzialmente Scremato'). Usa il contesto e la logica per completare nomi troncati. Struttura JSON richiesta: { negozio: string, data: string (formato DD/MM/YYYY, stringa vuota se non visibile), totale: number, prodotti: [ { nome_originale: string (testo esatto sullo scontrino), nome_completo: string (nome espanso e comprensibile), quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }",
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Analizza questo scontrino ed estrai i prodotti." },
-            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${data.imageBase64}` } },
-          ],
-        },
-      ],
-    });
-    const raw = completion.choices[0]?.message?.content ?? "{}";
+    let completion;
     try {
-      const parsed = JSON.parse(raw) as {
+      completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 2000,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Sei un esperto nell'analisi di scontrini italiani. Estrai i dati e restituisci ESCLUSIVAMENTE un JSON valido senza markdown né testo extra. Per i nomi: espandi le abbreviazioni comuni (es. 'PAST.BARILLA SPG 500' → 'Pasta Barilla Spaghetti 500g').",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${data.imageBase64}`,
+                  detail: "high",
+                },
+              },
+              {
+                type: "text",
+                text: "Analizza questo scontrino italiano e restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }",
+              },
+            ],
+          },
+        ],
+      });
+    } catch (err) {
+      console.error("[scanReceipt] OpenAI API error:", err);
+      throw new Error("Errore di connessione all'AI");
+    }
+    const raw = completion.choices[0]?.message?.content ?? "";
+    console.log("[scanReceipt] raw response:", raw);
+    const cleaned = extractJsonFromResponse(raw);
+    if (!cleaned) {
+      throw new Error("L'AI non ha restituito un formato valido, riprova");
+    }
+    try {
+      const parsed = cleaned as {
         negozio?: string;
         data?: string;
         totale?: number;
@@ -106,10 +126,47 @@ export const scanReceipt = createServerFn({ method: "POST" })
           category: p.categoria_suggerita?.trim() || "Altro",
         })).filter((it) => it.name_full),
       };
-    } catch {
-      return { store_name: null, purchase_date: null, total: null, items: [] };
+    } catch (err) {
+      console.error("[scanReceipt] shape error:", err);
+      throw new Error("L'AI non ha restituito un formato valido, riprova");
     }
   });
+
+// Strip markdown code fences and extract the first JSON object/array.
+// Returns the parsed value or null if no valid JSON could be recovered.
+function extractJsonFromResponse(response: string): any | null {
+  if (!response) return null;
+  let cleaned = response
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+  const startObj = cleaned.indexOf("{");
+  const startArr = cleaned.indexOf("[");
+  let start = -1;
+  if (startObj === -1) start = startArr;
+  else if (startArr === -1) start = startObj;
+  else start = Math.min(startObj, startArr);
+  if (start === -1) return null;
+  const openChar = cleaned[start];
+  const closeChar = openChar === "[" ? "]" : "}";
+  const end = cleaned.lastIndexOf(closeChar);
+  if (end === -1 || end < start) return null;
+  cleaned = cleaned.substring(start, end + 1);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    try {
+      const repaired = cleaned
+        .replace(/,\s*}/g, "}")
+        .replace(/,\s*]/g, "]")
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\x00-\x1F\x7F]/g, "");
+      return JSON.parse(repaired);
+    } catch {
+      return null;
+    }
+  }
+}
 
 const chatInput = z.object({
   messages: z
