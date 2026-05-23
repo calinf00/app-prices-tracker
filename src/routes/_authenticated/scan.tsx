@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -75,6 +75,7 @@ const itToIso = (it: string) => {
 
 function ScanPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -98,6 +99,8 @@ function ScanPage() {
 
   const scan = useServerFn(scanReceipt);
   const qc = useQueryClient();
+
+  if (location.pathname !== "/scan") return <Outlet />;
 
   // Recent scans (history)
   const recent = useQuery({
