@@ -60,9 +60,7 @@ export async function compressImage(
   const minReadableQuality = 0.72;
   while (blob && blob.size > maxBytes && quality > minReadableQuality) {
     quality = Math.max(minReadableQuality, quality - 0.06);
-    blob = await new Promise((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/jpeg", quality),
-    );
+    blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
   }
   if (!blob) throw new Error("Compressione fallita");
 
