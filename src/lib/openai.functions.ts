@@ -178,7 +178,7 @@ export const smartShoppingList = createServerFn({ method: "POST" })
       const prod = productsById.get(p.product_id);
       if (!prod) return;
       const entry = byProduct.get(p.product_id) ?? { name: prod.name, dates: [] };
-      entry.dates.push(p.purchase_date);
+      entry.dates.push(String(p.purchase_date));
       byProduct.set(p.product_id, entry);
     });
 
