@@ -17,6 +17,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedScanRouteImport } from './routes/_authenticated/scan'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedAssistantRouteImport } from './routes/_authenticated/assistant'
+import { Route as AuthenticatedScanGroupIdRouteImport } from './routes/_authenticated/scan.$groupId'
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 
@@ -60,6 +61,12 @@ const AuthenticatedAssistantRoute = AuthenticatedAssistantRouteImport.update({
   path: '/assistant',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedScanGroupIdRoute =
+  AuthenticatedScanGroupIdRouteImport.update({
+    id: '/$groupId',
+    path: '/$groupId',
+    getParentRoute: () => AuthenticatedScanRoute,
+  } as any)
 const AuthenticatedProductsNewRoute =
   AuthenticatedProductsNewRouteImport.update({
     id: '/new',
@@ -77,22 +84,24 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/assistant': typeof AuthenticatedAssistantRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
-  '/scan': typeof AuthenticatedScanRoute
+  '/scan': typeof AuthenticatedScanRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
+  '/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/assistant': typeof AuthenticatedAssistantRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
-  '/scan': typeof AuthenticatedScanRoute
+  '/scan': typeof AuthenticatedScanRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
   '/': typeof AuthenticatedIndexRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
+  '/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -100,12 +109,13 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/assistant': typeof AuthenticatedAssistantRoute
   '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
-  '/_authenticated/scan': typeof AuthenticatedScanRoute
+  '/_authenticated/scan': typeof AuthenticatedScanRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping-list': typeof AuthenticatedShoppingListRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
+  '/_authenticated/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/shopping-list'
     | '/products/$id'
     | '/products/new'
+    | '/scan/$groupId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/products/$id'
     | '/products/new'
+    | '/scan/$groupId'
   id:
     | '__root__'
     | '/_authenticated'
@@ -142,6 +154,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/products/$id'
     | '/_authenticated/products/new'
+    | '/_authenticated/scan/$groupId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssistantRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/scan/$groupId': {
+      id: '/_authenticated/scan/$groupId'
+      path: '/$groupId'
+      fullPath: '/scan/$groupId'
+      preLoaderRoute: typeof AuthenticatedScanGroupIdRouteImport
+      parentRoute: typeof AuthenticatedScanRoute
+    }
     '/_authenticated/products/new': {
       id: '/_authenticated/products/new'
       path: '/new'
@@ -239,10 +259,21 @@ const AuthenticatedProductsRouteWithChildren =
     AuthenticatedProductsRouteChildren,
   )
 
+interface AuthenticatedScanRouteChildren {
+  AuthenticatedScanGroupIdRoute: typeof AuthenticatedScanGroupIdRoute
+}
+
+const AuthenticatedScanRouteChildren: AuthenticatedScanRouteChildren = {
+  AuthenticatedScanGroupIdRoute: AuthenticatedScanGroupIdRoute,
+}
+
+const AuthenticatedScanRouteWithChildren =
+  AuthenticatedScanRoute._addFileChildren(AuthenticatedScanRouteChildren)
+
 interface AuthenticatedRouteChildren {
   AuthenticatedAssistantRoute: typeof AuthenticatedAssistantRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
-  AuthenticatedScanRoute: typeof AuthenticatedScanRoute
+  AuthenticatedScanRoute: typeof AuthenticatedScanRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedShoppingListRoute: typeof AuthenticatedShoppingListRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -251,7 +282,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAssistantRoute: AuthenticatedAssistantRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
-  AuthenticatedScanRoute: AuthenticatedScanRoute,
+  AuthenticatedScanRoute: AuthenticatedScanRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedShoppingListRoute: AuthenticatedShoppingListRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,

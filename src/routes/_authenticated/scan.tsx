@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,7 +13,6 @@ import {
   Trash2,
   Plus,
   X,
-  ZoomIn,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ import { toast } from "sonner";
 import { scanReceipt } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
-import { compressImage, cropImageToFile, fileToBase64 } from "@/lib/image-compress";
+import { compressImage, cropImageToFile } from "@/lib/image-compress";
 import { lazy, Suspense } from "react";
 const ReceiptCrop = lazy(() =>
   import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
@@ -55,6 +54,14 @@ type Item = {
 
 type Step = "capture" | "crop" | "preview" | "analyzing" | "review";
 
+type CapturedImage = {
+  file: File;        // compressed jpeg ready to upload
+  preview: string;   // data URL for thumbnail
+  base64: string;    // raw base64 for OpenAI
+};
+
+const MAX_IMAGES = 5;
+
 // Convert ISO YYYY-MM-DD to DD/MM/YYYY
 const isoToIt = (iso: string) => {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -71,9 +78,10 @@ function ScanPage() {
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("capture");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [base64, setBase64] = useState<string | null>(null);
+  const [images, setImages] = useState<CapturedImage[]>([]);
+  // The image currently being cropped (added to `images` on confirm).
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -83,6 +91,7 @@ function ScanPage() {
   const [dateDetected, setDateDetected] = useState(true);
   const [items, setItems] = useState<Item[]>([]);
   const [zoom, setZoom] = useState(false);
+  const [zoomIdx, setZoomIdx] = useState(0);
   const [storeSuggestOpen, setStoreSuggestOpen] = useState(false);
   const [storeError, setStoreError] = useState(false);
 
@@ -95,19 +104,28 @@ function ScanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("store_name, purchase_date")
+        .select("store_name, purchase_date, receipt_group_id, id")
         .order("purchase_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      const groups = new Map<string, { store: string | null; date: string; count: number }>();
+      const groups = new Map<
+        string,
+        { key: string; groupId: string | null; store: string | null; date: string; count: number }
+      >();
       (data ?? []).forEach((r: any) => {
-        const key = `${r.purchase_date}|${r.store_name ?? ""}`;
-        const g = groups.get(key) ?? { store: r.store_name, date: r.purchase_date, count: 0 };
+        const key = r.receipt_group_id ?? `${r.purchase_date}|${r.store_name ?? ""}`;
+        const g = groups.get(key) ?? {
+          key,
+          groupId: r.receipt_group_id ?? null,
+          store: r.store_name,
+          date: r.purchase_date,
+          count: 0,
+        };
         g.count += 1;
         groups.set(key, g);
       });
-      return Array.from(groups.values()).slice(0, 5);
+      return Array.from(groups.values()).slice(0, 10);
     },
   });
 
@@ -136,12 +154,11 @@ function ScanPage() {
 
   const handleFile = (file: File) => {
     setError(null);
-    setImageFile(file);
+    setPendingFile(file);
     const r = new FileReader();
     r.onload = () => {
       const dataUrl = r.result as string;
-      setPreview(dataUrl);
-      setBase64(null);
+      setPendingPreview(dataUrl);
       setStep("crop");
     };
     r.readAsDataURL(file);
@@ -149,9 +166,9 @@ function ScanPage() {
 
   const resetAll = () => {
     setStep("capture");
-    setImageFile(null);
-    setPreview(null);
-    setBase64(null);
+    setImages([]);
+    setPendingFile(null);
+    setPendingPreview(null);
     setError(null);
     setItems([]);
     setStore("");
@@ -160,11 +177,16 @@ function ScanPage() {
     setDateDetected(true);
   };
 
-  const runAnalyze = async (b64: string) => {
+  const runAnalyze = async (imgs: CapturedImage[]) => {
     setStep("analyzing");
     setError(null);
     try {
-      const result = await scan({ data: { imageBase64: b64 } });
+      const result = await scan({
+        data:
+          imgs.length === 1
+            ? { imageBase64: imgs[0].base64 }
+            : { imagesBase64: imgs.map((i) => i.base64) },
+      });
       const detectedStore = result.store_name ?? "";
       setStore(detectedStore);
       setStoreDetected(!!detectedStore);
@@ -193,19 +215,8 @@ function ScanPage() {
   };
 
   const analyze = async () => {
-    if (base64) return runAnalyze(base64);
-    if (imageFile) {
-      try {
-        const compressed = await compressImage(imageFile);
-        setImageFile(compressed);
-        const b64 = await fileToBase64(compressed);
-        setBase64(b64);
-        return runAnalyze(b64);
-      } catch (e: any) {
-        setError(toUserMessage(e, "Errore preparazione immagine"));
-        setStep("preview");
-      }
-    }
+    if (images.length === 0) return;
+    return runAnalyze(images);
   };
 
   const handleCropConfirm = async (
@@ -216,27 +227,30 @@ function ScanPage() {
       let working: File;
       if (pixelCrop && pixelCrop.width > 0 && pixelCrop.height > 0) {
         working = await cropImageToFile(imageEl, pixelCrop);
-      } else if (imageFile) {
-        working = imageFile;
+      } else if (pendingFile) {
+        working = pendingFile;
       } else {
         return;
       }
       const compressed = await compressImage(working);
-      setImageFile(compressed);
       const dataUrl: string = await new Promise((resolve) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result as string);
         r.readAsDataURL(compressed);
       });
-      setPreview(dataUrl);
       const b64 = dataUrl.split(",")[1] ?? "";
-      setBase64(b64);
-      await runAnalyze(b64);
+      setImages((arr) => [...arr, { file: compressed, preview: dataUrl, base64: b64 }]);
+      setPendingFile(null);
+      setPendingPreview(null);
+      setStep("preview");
     } catch (e: any) {
       setError(toUserMessage(e, "Errore preparazione immagine"));
       setStep("preview");
     }
   };
+
+  const removeImage = (i: number) =>
+    setImages((arr) => arr.filter((_, idx) => idx !== i));
 
   const updateItem = (i: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
@@ -284,21 +298,38 @@ function ScanPage() {
     }
     setSaving(true);
     try {
-      // Upload receipt image first (associated only when user confirms save)
-      let receiptUrl: string | null = null;
-      if (imageFile) {
+      // Generate a stable group_id for this receipt scan.
+      const groupId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      // Upload all images to storage and record them in receipt_images.
+      const uploadedPaths: string[] = [];
+      if (images.length > 0) {
         const { data: userData } = await supabase.auth.getUser();
         const uid = userData.user?.id;
         if (uid) {
-          const ext = (imageFile.name.split(".").pop() || "jpg").toLowerCase();
-          const path = `${uid}/${Date.now()}.${ext}`;
-          const { error: upErr } = await supabase.storage
-            .from("receipts")
-            .upload(path, imageFile, { contentType: imageFile.type || "image/jpeg" });
-          if (!upErr) receiptUrl = path;
-          else console.warn("[scan.save] receipt upload failed", upErr);
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            const path = `${uid}/${Date.now()}-${i}.jpg`;
+            const { error: upErr } = await supabase.storage
+              .from("receipts")
+              .upload(path, img.file, { contentType: "image/jpeg" });
+            if (!upErr) {
+              uploadedPaths.push(path);
+              await supabase.from("receipt_images").insert({
+                receipt_group_id: groupId,
+                storage_path: path,
+                position: i,
+              });
+            } else {
+              console.warn("[scan.save] receipt upload failed", upErr);
+            }
+          }
         }
       }
+      const receiptUrl = uploadedPaths[0] ?? null;
 
       for (const [idx, item] of selected.entries()) {
         const cleanName = item.name_full.trim();
@@ -330,6 +361,7 @@ function ScanPage() {
           unit: item.unit,
           purchase_date: effectiveDate,
           notes: "Importato da scontrino",
+          receipt_group_id: groupId,
         };
         if (receiptUrl) purchasePayload.receipt_url = receiptUrl;
         console.log("[scan.save] inserting purchase", purchasePayload);
@@ -443,22 +475,30 @@ function ScanPage() {
               )}
             </div>
 
-            {/* Thumbnail */}
-            {preview && (
-              <button
-                type="button"
-                onClick={() => setZoom(true)}
-                className="relative block rounded-md overflow-hidden border bg-muted h-20 w-full"
-              >
-                <img
-                  src={preview}
-                  alt="scontrino"
-                  className="h-full w-full object-cover opacity-80"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-xs gap-1">
-                  <ZoomIn className="h-4 w-4" /> Tocca per ingrandire
-                </div>
-              </button>
+            {/* Thumbnails strip */}
+            {images.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setZoomIdx(i);
+                      setZoom(true);
+                    }}
+                    className="relative shrink-0 rounded-md overflow-hidden border bg-muted h-20 w-20"
+                  >
+                    <img
+                      src={img.preview}
+                      alt={`scontrino ${i + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1">
+                      {i + 1}/{images.length}
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -599,8 +639,12 @@ function ScanPage() {
         {/* Zoom dialog */}
         <Dialog open={zoom} onOpenChange={setZoom}>
           <DialogContent className="max-w-3xl p-2">
-            {preview && (
-              <img src={preview} alt="scontrino" className="w-full h-auto rounded" />
+            {images[zoomIdx] && (
+              <img
+                src={images[zoomIdx].preview}
+                alt="scontrino"
+                className="w-full h-auto rounded"
+              />
             )}
           </DialogContent>
         </Dialog>
@@ -611,10 +655,10 @@ function ScanPage() {
   // Capture / preview / analyzing
   return (
     <div className="space-y-4 pb-8">
-      {step === "crop" && preview && (
+      {step === "crop" && pendingPreview && (
         <Suspense fallback={null}>
           <ReceiptCrop
-            src={preview}
+            src={pendingPreview}
             onCancel={resetAll}
             onConfirm={handleCropConfirm}
           />
@@ -666,13 +710,50 @@ function ScanPage() {
         </div>
       )}
 
-      {(step === "preview" || step === "analyzing") && preview && (
+      {(step === "preview" || step === "analyzing") && images.length > 0 && (
         <Card className="p-3 space-y-3">
-          <img
-            src={preview}
-            alt="scontrino"
-            className="w-full max-h-80 object-contain rounded-md bg-muted"
-          />
+          {/* Thumbnails of all captured images */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {images.map((img, i) => (
+              <div
+                key={i}
+                className="relative shrink-0 rounded-md overflow-hidden border bg-muted h-28 w-28"
+              >
+                <img
+                  src={img.preview}
+                  alt={`pag ${i + 1}`}
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  className="absolute top-1 right-1 rounded-full bg-black/70 text-white p-1"
+                  aria-label="Rimuovi"
+                  disabled={step === "analyzing"}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-0.5">
+                  {i + 1}/{images.length}
+                </div>
+              </div>
+            ))}
+            {images.length < MAX_IMAGES && step !== "analyzing" && (
+              <button
+                type="button"
+                onClick={() => galleryRef.current?.click()}
+                className="shrink-0 rounded-md border border-dashed h-28 w-28 grid place-items-center text-xs text-muted-foreground hover:bg-muted/50"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <Plus className="h-5 w-5" />
+                  Aggiungi foto
+                </div>
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground text-center">
+            {images.length}/{MAX_IMAGES} foto · puoi aggiungere più foto per scontrini lunghi
+          </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -680,7 +761,7 @@ function ScanPage() {
               onClick={resetAll}
               disabled={step === "analyzing"}
             >
-              <RefreshCw className="h-4 w-4 mr-2" /> Rifare foto
+              <RefreshCw className="h-4 w-4 mr-2" /> Annulla
             </Button>
             <Button
               className="flex-1 h-11"
@@ -747,21 +828,49 @@ function ScanPage() {
           ) : (
             <div className="space-y-2">
               {recent.data!.map((s, i) => (
-                <Card key={i} className="p-3 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{s.store ?? "—"}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(s.date).toLocaleDateString("it-IT", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                s.groupId ? (
+                  <Link
+                    key={s.key}
+                    to="/scan/$groupId"
+                    params={{ groupId: s.groupId }}
+                  >
+                    <Card className="p-3 flex items-center justify-between hover:border-primary/40 transition-colors">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{s.store ?? "—"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(s.date).toLocaleDateString("it-IT", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground shrink-0">
+                        {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
+                      </div>
+                    </Card>
+                  </Link>
+                ) : (
+                  <Card
+                    key={s.key + i}
+                    className="p-3 flex items-center justify-between opacity-70"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{s.store ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(s.date).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                        {" · "}scansione legacy
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground shrink-0">
-                    {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
-                  </div>
-                </Card>
+                    <div className="text-xs text-muted-foreground shrink-0">
+                      {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
+                    </div>
+                  </Card>
+                )
               ))}
             </div>
           )}
