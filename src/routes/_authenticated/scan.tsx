@@ -175,7 +175,7 @@ function ScanPage() {
       }));
       setItems(parsed);
       if (parsed.length === 0) {
-        setError("Nessun prodotto riconosciuto. Riprova con un'immagine più nitida.");
+        setError("Nessun prodotto trovato nello scontrino");
         setStep("preview");
       } else {
         setStep("review");
