@@ -7,9 +7,9 @@
  */
 export async function compressImage(
   file: File | Blob,
-  maxWidth = 1920,
-  initialQuality = 0.85,
-  maxBytes = 1.5 * 1024 * 1024,
+  maxWidth = 1280,
+  initialQuality = 0.75,
+  maxBytes = 900 * 1024,
 ): Promise<File> {
   const originalSize = file.size;
   const originalType = (file as File).type || "image/jpeg";
