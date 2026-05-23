@@ -16,11 +16,17 @@ const SAFE_AUTH_FRAGMENTS = [
 const SAFE_AI_MESSAGES = [
   "Errore di connessione all'AI",
   "L'AI non ha restituito un formato valido, riprova",
+  "Almeno un'immagine richiesta",
+  "Formato immagine non valido",
+  "Immagine troppo grande. Ritaglia solo lo scontrino e riprova.",
   "Immagine non leggibile, prova con una foto più nitida",
   "Nessun prodotto trovato nello scontrino",
 ];
 
-export function toUserMessage(err: unknown, fallback = "Si è verificato un errore. Riprova."): string {
+export function toUserMessage(
+  err: unknown,
+  fallback = "Si è verificato un errore. Riprova.",
+): string {
   // Always log the real error for debugging.
   // eslint-disable-next-line no-console
   console.error("[app error]", err);
