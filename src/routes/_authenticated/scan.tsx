@@ -340,7 +340,6 @@ function ScanPage() {
         const { data: matches } = await supabase
           .from("products")
           .select("id, name")
-          .eq("user_id", uid)
           .ilike("name", cleanName)
           .limit(1);
         let productId = matches?.[0]?.id;
@@ -348,7 +347,7 @@ function ScanPage() {
           console.log("[scan.save] creating product", cleanName);
           const { data: created, error: pErr } = await supabase
             .from("products")
-            .insert({ name: cleanName, category: item.category, user_id: uid })
+            .insert({ name: cleanName, category: item.category })
             .select("id")
             .single();
           if (pErr) {
