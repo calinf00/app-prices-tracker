@@ -9,8 +9,12 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       throw new Response("Unauthorized: No authorization header provided", { status: 401 });
     }
 
-    const SUPABASE_URL = (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL) as string;
-    const SUPABASE_PUBLISHABLE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
+    const SUPABASE_URL = (process.env.SUPABASE_URL ??
+      process.env.VITE_SUPABASE_URL ??
+      import.meta.env.VITE_SUPABASE_URL) as string;
+    const SUPABASE_PUBLISHABLE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY ??
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
     if (!SUPABASE_URL) {
       console.error("VITE_SUPABASE_URL non configurata");
