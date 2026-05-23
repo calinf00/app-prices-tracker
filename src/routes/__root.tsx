@@ -12,6 +12,7 @@ import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/use-auth";
+import { IosInstallHint } from "@/components/ios-install-hint";
 
 function NotFoundComponent() {
   return (
@@ -130,6 +131,7 @@ function RootComponent() {
         <AuthProvider>
           <Outlet />
           <Toaster richColors position="top-center" />
+          <IosInstallHint />
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
