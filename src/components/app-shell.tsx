@@ -2,13 +2,14 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Camera, Package, ShoppingCart, Bot, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 
-const tabs = [
+type Tab = { to: string; label: string; icon: typeof Home; exact?: boolean };
+const tabs: Tab[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/scan", label: "Scansiona", icon: Camera },
   { to: "/products", label: "Prodotti", icon: Package },
   { to: "/shopping-list", label: "Lista", icon: ShoppingCart },
   { to: "/assistant", label: "Assistente", icon: Bot },
-] as const;
+];
 
 const titles: Record<string, string> = {
   "/": "Home",
@@ -48,11 +49,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[640px] items-stretch justify-around h-16 px-1">
           {tabs.map(({ to, label, icon: Icon, exact }) => {
-            const active = exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+            const active = exact
+              ? pathname === to
+              : pathname === to || pathname.startsWith(to + "/");
             return (
               <Link
                 key={to}
-                to={to}
+                to={to as "/"}
                 className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium transition-colors ${
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
