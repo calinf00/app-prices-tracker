@@ -84,6 +84,7 @@ function ScanPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [zoom, setZoom] = useState(false);
   const [storeSuggestOpen, setStoreSuggestOpen] = useState(false);
+  const [storeError, setStoreError] = useState(false);
 
   const scan = useServerFn(scanReceipt);
   const qc = useQueryClient();
@@ -263,14 +264,23 @@ function ScanPage() {
     .reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
 
   const save = async () => {
+    console.log("[scan.save] start", { itemsCount: items.length });
     const selected = items.filter((it) => it.selected && it.name_full.trim());
     if (selected.length === 0) {
       toast.error("Nessun prodotto selezionato");
       return;
     }
-    if (!dateIso) {
-      toast.error("Inserisci la data dell'acquisto");
+    if (!store.trim()) {
+      setStoreError(true);
+      toast.error("⚠️ Inserisci il nome del negozio prima di salvare");
       return;
+    }
+    setStoreError(false);
+    let effectiveDate = dateIso;
+    if (!effectiveDate) {
+      effectiveDate = new Date().toISOString().slice(0, 10);
+      setDateIso(effectiveDate);
+      toast.warning("Data non rilevata: verrà usata la data di oggi");
     }
     setSaving(true);
     try {
@@ -286,12 +296,13 @@ function ScanPage() {
             .from("receipts")
             .upload(path, imageFile, { contentType: imageFile.type || "image/jpeg" });
           if (!upErr) receiptUrl = path;
+          else console.warn("[scan.save] receipt upload failed", upErr);
         }
       }
 
-      for (const item of selected) {
+      for (const [idx, item] of selected.entries()) {
         const cleanName = item.name_full.trim();
-        // Try to find existing product (case-insensitive exact match preferred, else ilike)
+        console.log(`[scan.save] (${idx + 1}/${selected.length}) lookup`, cleanName);
         const { data: matches } = await supabase
           .from("products")
           .select("id, name")
@@ -299,12 +310,16 @@ function ScanPage() {
           .limit(1);
         let productId = matches?.[0]?.id;
         if (!productId) {
+          console.log("[scan.save] creating product", cleanName);
           const { data: created, error: pErr } = await supabase
             .from("products")
             .insert({ name: cleanName, category: item.category })
             .select("id")
             .single();
-          if (pErr) throw pErr;
+          if (pErr) {
+            console.error("[scan.save] product insert error", pErr);
+            throw pErr;
+          }
           productId = created.id;
         }
         const purchasePayload: any = {
@@ -313,21 +328,29 @@ function ScanPage() {
           price: item.price,
           quantity: item.quantity || 1,
           unit: item.unit,
-          purchase_date: dateIso,
+          purchase_date: effectiveDate,
+          notes: "Importato da scontrino",
         };
         if (receiptUrl) purchasePayload.receipt_url = receiptUrl;
+        console.log("[scan.save] inserting purchase", purchasePayload);
         const { error: puErr } = await supabase
           .from("purchases")
           .insert(purchasePayload);
-        if (puErr) throw puErr;
+        if (puErr) {
+          console.error("[scan.save] purchase insert error", puErr);
+          throw puErr;
+        }
       }
       toast.success(`✅ ${selected.length} prodotti salvati con successo`);
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       qc.invalidateQueries({ queryKey: ["known-stores"] });
-      resetAll();
-      navigate({ to: "/" });
+      setTimeout(() => {
+        resetAll();
+        navigate({ to: "/" });
+      }, 1500);
     } catch (e: any) {
+      console.error("[scan.save] failed", e);
       toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
@@ -357,12 +380,24 @@ function ScanPage() {
                 onChange={(e) => {
                   setStore(e.target.value);
                   setStoreSuggestOpen(true);
+                  if (e.target.value.trim()) setStoreError(false);
                 }}
                 onFocus={() => setStoreSuggestOpen(true)}
                 onBlur={() => setTimeout(() => setStoreSuggestOpen(false), 150)}
                 placeholder="Es. Esselunga"
-                className={!storeDetected ? "border-orange-500" : ""}
+                className={
+                  storeError
+                    ? "border-destructive ring-2 ring-destructive"
+                    : !storeDetected
+                      ? "border-orange-500"
+                      : ""
+                }
               />
+              {storeError && (
+                <p className="text-xs text-destructive mt-1">
+                  Inserisci il nome del negozio
+                </p>
+              )}
               {storeSuggestOpen && storeMatches.length > 0 && (
                 <Card className="absolute z-20 left-0 right-0 mt-1 p-1 max-h-48 overflow-auto">
                   {storeMatches.map((s) => (
@@ -429,7 +464,7 @@ function ScanPage() {
         </div>
 
         {/* Items list */}
-        <div className="flex-1 px-4 py-3 space-y-2 pb-32">
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-40">
           {items.map((it, i) => (
             <Card key={i} className="p-3 space-y-2">
               <div className="flex items-start gap-2">
@@ -528,7 +563,10 @@ function ScanPage() {
         </div>
 
         {/* Footer */}
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-10">
+        <div
+          className="fixed bottom-0 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50"
+          style={{ paddingBottom: "max(12px, calc(env(safe-area-inset-bottom) + 80px))" }}
+        >
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {selectedCount} di {items.length} selezionati
@@ -540,14 +578,14 @@ function ScanPage() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              className="flex-1 h-11"
+              className="flex-1 h-[52px] text-base"
               onClick={resetAll}
               disabled={saving}
             >
               Annulla
             </Button>
             <Button
-              className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="flex-1 h-[52px] text-base bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={save}
               disabled={saving || selectedCount === 0}
             >
