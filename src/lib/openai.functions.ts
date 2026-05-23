@@ -53,6 +53,88 @@ const scanInput = z
     message: "Almeno un'immagine richiesta",
   });
 
+type ReceiptAIResponse = {
+  negozio?: string;
+  data?: string;
+  totale?: number;
+  prodotti?: Array<{
+    nome?: string;
+    nome_originale?: string;
+    nome_completo?: string;
+    quantita?: number;
+    unita?: string;
+    prezzo_unitario?: number;
+    prezzo_totale?: number;
+    categoria_suggerita?: string;
+  }>;
+};
+
+function normalizeReceiptResult(parsed: ReceiptAIResponse) {
+  let isoDate: string | null = null;
+  const m = (parsed.data ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) isoDate = `${m[3]}-${m[2]}-${m[1]}`;
+  return {
+    store_name: parsed.negozio?.trim() || null,
+    purchase_date: isoDate,
+    total: Number(parsed.totale) || null,
+    items: (parsed.prodotti ?? [])
+      .map((p) => ({
+        name_original: (p.nome_originale ?? p.nome ?? "").trim(),
+        name_full: (p.nome_completo ?? p.nome_originale ?? p.nome ?? "").trim(),
+        quantity: Number(p.quantita) || 1,
+        unit: p.unita?.trim() || "pz",
+        price: Number(p.prezzo_unitario ?? p.prezzo_totale) || 0,
+        price_total: Number(p.prezzo_totale) || 0,
+        category: p.categoria_suggerita?.trim() || "Altro",
+      }))
+      .filter((it) => it.name_full),
+  };
+}
+
+async function requestReceiptExtraction(
+  client: OpenAI,
+  images: string[],
+  promptText: string,
+  fallback = false,
+) {
+  const completion = await client.chat.completions.create(
+    {
+      model: "gpt-4o",
+      max_tokens: 8000,
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content: fallback
+            ? "Sei un OCR specializzato in scontrini italiani difficili da leggere. Prima trascrivi mentalmente tutte le righe con prezzo, poi convertile nel JSON richiesto. Non restituire prodotti vuoti se vedi anche solo nomi parziali o prezzi di riga. Escludi totale, IVA, pagamento, resto e messaggi promozionali. Rispondi solo con JSON valido."
+            : "Sei un motore OCR esperto di scontrini italiani. Leggi attentamente tutte le righe prodotto, incluse abbreviazioni, codici tagliati, colonne quantità/prezzo e righe stampate in piccolo. Non ignorare le righe solo perché il testo è parziale: ricostruisci il nome più probabile. Estrai almeno tutte le righe con un prezzo a destra sopra il totale/fiscale. Restituisci ESCLUSIVAMENTE un JSON valido senza markdown né testo extra. Per i nomi: espandi le abbreviazioni comuni (es. 'PAST.BARILLA SPG 500' → 'Pasta Barilla Spaghetti 500g').",
+        },
+        {
+          role: "user",
+          content: [
+            ...images.map((b64) => ({
+              type: "image_url" as const,
+              image_url: {
+                url: `data:image/jpeg;base64,${b64}`,
+                detail: "high" as const,
+              },
+            })),
+            {
+              type: "text" as const,
+              text: `${promptText}\n\nRegole importanti: restituisci JSON con chiave prodotti sempre presente. Se lo scontrino è leggibile ma non sei sicuro di un prodotto, includilo comunque con il nome più fedele possibile invece di restituire lista vuota. Escludi solo subtotali, totale, IVA, pagamento, resto, punti e messaggi promozionali.`,
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+    },
+    { timeout: 60000 },
+  );
+  const choice = completion.choices[0];
+  console.log(`[scanReceipt] ${fallback ? "fallback " : ""}finish_reason:`, choice?.finish_reason);
+  return choice?.message?.content ?? "";
+}
+
 export const scanReceipt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => scanInput.parse(input))
