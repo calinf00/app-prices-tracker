@@ -177,7 +177,7 @@ export const smartShoppingList = createServerFn({ method: "POST" })
     (purchases ?? []).forEach((p: any) => {
       const prod = productsById.get(p.product_id);
       if (!prod) return;
-      const entry = byProduct.get(p.product_id) ?? { name: prod.name, dates: [] };
+      const entry = byProduct.get(p.product_id) ?? { name: String(prod.name), dates: [] as string[] };
       entry.dates.push(String(p.purchase_date));
       byProduct.set(p.product_id, entry);
     });
