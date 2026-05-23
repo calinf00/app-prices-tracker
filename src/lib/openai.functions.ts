@@ -129,7 +129,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
       let isoDate: string | null = null;
       const m = (parsed.data ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m) isoDate = `${m[3]}-${m[2]}-${m[1]}`;
-      return {
+      const result = {
         store_name: parsed.negozio?.trim() || null,
         purchase_date: isoDate,
         total: Number(parsed.totale) || null,
@@ -143,6 +143,8 @@ export const scanReceipt = createServerFn({ method: "POST" })
           category: p.categoria_suggerita?.trim() || "Altro",
         })).filter((it) => it.name_full),
       };
+      console.log("[scanReceipt] parsed items:", result.items.length);
+      return result;
     } catch (err) {
       console.error("[scanReceipt] shape error:", err);
       throw new Error("L'AI non ha restituito un formato valido, riprova");
