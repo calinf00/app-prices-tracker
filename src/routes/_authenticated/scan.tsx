@@ -331,7 +331,7 @@ function ScanPage() {
             if (retry?.[0]?.id) {
               productId = retry[0].id;
             } else {
-              throw new Error(`Prodotto "${cleanName}": ${pErr.message}`);
+              throw new Error(`Impossibile salvare il prodotto "${cleanName}"`);
             }
           } else {
             productId = created.id;
@@ -352,7 +352,7 @@ function ScanPage() {
           .insert(purchasePayload);
         if (puErr) {
           console.error("[scan.save] purchase insert error", puErr);
-          throw new Error(`Acquisto "${cleanName}": ${puErr.message}`);
+          throw new Error(`Impossibile salvare l'acquisto "${cleanName}"`);
         }
       }
       toast.success(`✅ ${selected.length} prodotti salvati con successo`);
@@ -365,8 +365,7 @@ function ScanPage() {
       }, 1500);
     } catch (e: any) {
       console.error("[scan.save] failed", e);
-      const detail = e?.message || e?.error_description || "";
-      toast.error(detail ? `Errore salvataggio: ${detail}` : "Errore salvataggio");
+      toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
     }
