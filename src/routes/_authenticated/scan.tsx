@@ -829,21 +829,49 @@ function ScanPage() {
           ) : (
             <div className="space-y-2">
               {recent.data!.map((s, i) => (
-                <Card key={i} className="p-3 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{s.store ?? "—"}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(s.date).toLocaleDateString("it-IT", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                s.groupId ? (
+                  <Link
+                    key={s.key}
+                    to="/scan/$groupId"
+                    params={{ groupId: s.groupId }}
+                  >
+                    <Card className="p-3 flex items-center justify-between hover:border-primary/40 transition-colors">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{s.store ?? "—"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(s.date).toLocaleDateString("it-IT", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground shrink-0">
+                        {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
+                      </div>
+                    </Card>
+                  </Link>
+                ) : (
+                  <Card
+                    key={s.key + i}
+                    className="p-3 flex items-center justify-between opacity-70"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{s.store ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(s.date).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                        {" · "}scansione legacy
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground shrink-0">
-                    {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
-                  </div>
-                </Card>
+                    <div className="text-xs text-muted-foreground shrink-0">
+                      {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
+                    </div>
+                  </Card>
+                )
               ))}
             </div>
           )}
