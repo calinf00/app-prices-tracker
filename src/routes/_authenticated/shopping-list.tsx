@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -234,7 +235,7 @@ function ShoppingListPage() {
       setRecents(loadJSON<string[]>(RECENTS_KEY, []));
       qc.invalidateQueries({ queryKey: ["shopping_list"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(toUserMessage(e)),
   });
 
   const toggle = useMutation({
@@ -410,7 +411,7 @@ function ShoppingListPage() {
       setLoadTplOpen(false);
       qc.invalidateQueries({ queryKey: ["shopping_list"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e, "Errore"));
     }
   };
 
@@ -433,7 +434,7 @@ function ShoppingListPage() {
         })),
       );
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore AI");
+      toast.error(toUserMessage(e, "Errore AI"));
     } finally {
       setSmartLoading(false);
     }
@@ -461,7 +462,7 @@ function ShoppingListPage() {
       setSmartSuggestions([]);
       qc.invalidateQueries({ queryKey: ["shopping_list"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e, "Errore"));
     }
   };
 

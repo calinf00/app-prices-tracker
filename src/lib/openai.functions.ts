@@ -9,14 +9,50 @@ function getClient() {
   return new OpenAI({ apiKey: key });
 }
 
+// Per-user, per-function sliding-window rate limit. Counts rows in the
+// `ai_rate_limits` table for the current user within `windowMs`, throws
+// a user-friendly Italian error when the cap is exceeded, and otherwise
+// records the new call. RLS scopes inserts/reads to the calling user.
+async function enforceRateLimit(
+  supabase: any,
+  userId: string,
+  fnName: string,
+  max: number,
+  windowMs: number,
+) {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { count, error } = await supabase
+    .from("ai_rate_limits")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("fn_name", fnName)
+    .gte("called_at", since);
+  if (error) {
+    // Fail-open on the limiter itself (the table may not exist yet on a
+    // fresh project), but log so operators can spot it.
+    console.error("[rate-limit lookup failed]", error);
+    return;
+  }
+  if ((count ?? 0) >= max) {
+    throw new Error(
+      `Limite di utilizzo raggiunto per questa funzione (${max} chiamate / ${Math.round(
+        windowMs / 3600000,
+      )}h). Riprova più tardi.`,
+    );
+  }
+  await supabase.from("ai_rate_limits").insert({ user_id: userId, fn_name: fnName });
+}
+
 const scanInput = z.object({
-  imageBase64: z.string().min(20).max(15_000_000),
+  // ~2 MB raw image (base64 is ~33% larger). Receipts don't need more.
+  imageBase64: z.string().min(20).max(2_800_000),
 });
 
 export const scanReceipt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => scanInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await enforceRateLimit(context.supabase, context.userId, "scanReceipt", 20, 24 * 3600_000);
     const client = getClient();
     const completion = await client.chat.completions.create({
       model: "gpt-4o",
@@ -86,6 +122,7 @@ export const chatAssistant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => chatInput.parse(input))
   .handler(async ({ data, context }) => {
+    await enforceRateLimit(context.supabase, context.userId, "chatAssistant", 60, 3600_000);
     const client = getClient();
     const { supabase } = context;
 
@@ -120,7 +157,8 @@ const estimateInput = z.object({
 export const estimatePrice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => estimateInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await enforceRateLimit(context.supabase, context.userId, "estimatePrice", 120, 3600_000);
     const client = getClient();
     const completion = await client.chat.completions.create({
       model: "gpt-4o",
@@ -155,6 +193,7 @@ export const smartShoppingList = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => smartInput.parse(input))
   .handler(async ({ data, context }) => {
+    await enforceRateLimit(context.supabase, context.userId, "smartShoppingList", 30, 3600_000);
     const client = getClient();
     const { supabase } = context;
 

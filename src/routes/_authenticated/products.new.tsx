@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useRef, useState } from "react";
 import { ArrowLeft, Camera, Loader2, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -81,7 +82,7 @@ function NewProductPage() {
       toast.success("Prodotto creato");
       navigate({ to: "/products/$id", params: { id: product.id } });
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore salvataggio");
+      toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
     }

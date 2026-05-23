@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Send, Bot, Plus } from "lucide-react";
@@ -63,7 +64,7 @@ function AssistantPage() {
       });
       setMessages((m) => [...m, { role: "assistant", content: res.reply || "..." }]);
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e, "Errore"));
     } finally {
       setLoading(false);
     }
