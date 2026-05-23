@@ -16,11 +16,15 @@ export const Route = createFileRoute("/api/check-migration")({
             .eq("column_name", "user_id")
             .eq("table_schema", "public");
 
-          const { data: rls } = await supabaseAdmin.rpc("check_rls_enabled", { table_name: table });
+          const { data: rlsRows } = await supabaseAdmin
+            .from("pg_class")
+            .select("relrowsecurity")
+            .eq("relname", table)
+            .single();
 
           results[table] = {
             hasUserId: (columns ?? []).length > 0,
-            rlsEnabled: !!rls,
+            rlsEnabled: !!rlsRows?.relrowsecurity,
           };
         }
 
