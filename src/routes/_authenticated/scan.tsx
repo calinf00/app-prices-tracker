@@ -399,7 +399,8 @@ function ScanPage() {
       }, 1500);
     } catch (e: any) {
       console.error("[scan.save] failed", e);
-      toast.error(toUserMessage(e, "Errore salvataggio"));
+      const detail = e?.message || e?.error_description || "";
+      toast.error(detail ? `Errore salvataggio: ${detail}` : "Errore salvataggio");
     } finally {
       setSaving(false);
     }
