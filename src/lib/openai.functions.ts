@@ -44,8 +44,11 @@ async function enforceRateLimit(
 }
 
 const scanInput = z.object({
-  // ~2 MB raw image (base64 is ~33% larger). Receipts don't need more.
-  imageBase64: z.string().min(20).max(2_800_000),
+  // Accept either a single image (legacy) or an array of up to 5 images.
+  imageBase64: z.string().min(20).max(2_800_000).optional(),
+  imagesBase64: z.array(z.string().min(20).max(2_800_000)).min(1).max(5).optional(),
+}).refine((v) => !!v.imageBase64 || (v.imagesBase64 && v.imagesBase64.length > 0), {
+  message: "Almeno un'immagine richiesta",
 });
 
 export const scanReceipt = createServerFn({ method: "POST" })
@@ -54,11 +57,16 @@ export const scanReceipt = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await enforceRateLimit(context.supabase, context.userId, "scanReceipt", 20, 24 * 3600_000);
     const client = getClient();
+    const images = data.imagesBase64 ?? (data.imageBase64 ? [data.imageBase64] : []);
+    const promptText =
+      images.length > 1
+        ? "Queste immagini appartengono allo STESSO scontrino italiano (parti diverse o pagine multiple). Analizzale tutte insieme ed estrai un UNICO elenco prodotti, eliminando i duplicati. Restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }"
+        : "Analizza questo scontrino italiano e restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }";
     let completion;
     try {
       completion = await client.chat.completions.create({
         model: "gpt-4o",
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [
           {
             role: "system",
@@ -68,17 +76,14 @@ export const scanReceipt = createServerFn({ method: "POST" })
           {
             role: "user",
             content: [
-              {
-                type: "image_url",
+              ...images.map((b64) => ({
+                type: "image_url" as const,
                 image_url: {
-                  url: `data:image/jpeg;base64,${data.imageBase64}`,
-                  detail: "high",
+                  url: `data:image/jpeg;base64,${b64}`,
+                  detail: "high" as const,
                 },
-              },
-              {
-                type: "text",
-                text: "Analizza questo scontrino italiano e restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }",
-              },
+              })),
+              { type: "text" as const, text: promptText },
             ],
           },
         ],
