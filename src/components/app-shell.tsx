@@ -42,7 +42,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-[640px] px-4 py-4 pb-24">
+      <main
+        key={pathname}
+        className="flex-1 mx-auto w-full max-w-[640px] px-4 py-4 pb-24 animate-fade-in"
+      >
         {children}
       </main>
 
