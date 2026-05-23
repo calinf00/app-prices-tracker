@@ -32,6 +32,7 @@ import { scanReceipt } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
 import { compressImage, cropImageToFile } from "@/lib/image-compress";
+import { encodeReceiptKey } from "@/lib/receipt-key";
 import { lazy, Suspense } from "react";
 const ReceiptCrop = lazy(() =>
   import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
@@ -104,20 +105,19 @@ function ScanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("store_name, purchase_date, receipt_group_id, id")
+        .select("store_name, purchase_date, id")
         .order("purchase_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
       const groups = new Map<
         string,
-        { key: string; groupId: string | null; store: string | null; date: string; count: number }
+        { key: string; store: string | null; date: string; count: number }
       >();
       (data ?? []).forEach((r: any) => {
-        const key = r.receipt_group_id ?? `${r.purchase_date}|${r.store_name ?? ""}`;
+        const key = `${r.purchase_date}|${r.store_name ?? ""}`;
         const g = groups.get(key) ?? {
           key,
-          groupId: r.receipt_group_id ?? null,
           store: r.store_name,
           date: r.purchase_date,
           count: 0,
@@ -843,33 +843,12 @@ function ScanPage() {
           ) : (
             <div className="space-y-2">
               {recent.data!.map((s, i) => (
-                s.groupId ? (
-                  <Link
-                    key={s.key}
-                    to="/scan/$groupId"
-                    params={{ groupId: s.groupId }}
-                  >
-                    <Card className="p-3 flex items-center justify-between hover:border-primary/40 transition-colors">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{s.store ?? "—"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(s.date).toLocaleDateString("it-IT", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground shrink-0">
-                        {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
-                      </div>
-                    </Card>
-                  </Link>
-                ) : (
-                  <Card
-                    key={s.key + i}
-                    className="p-3 flex items-center justify-between opacity-70"
-                  >
+                <Link
+                  key={s.key + i}
+                  to="/scan/$groupId"
+                  params={{ groupId: encodeReceiptKey(s.store, s.date) }}
+                >
+                  <Card className="p-3 flex items-center justify-between hover:border-primary/40 transition-colors">
                     <div className="min-w-0">
                       <div className="font-medium truncate">{s.store ?? "—"}</div>
                       <div className="text-xs text-muted-foreground">
@@ -878,14 +857,13 @@ function ScanPage() {
                           month: "short",
                           year: "numeric",
                         })}
-                        {" · "}scansione legacy
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground shrink-0">
                       {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
                     </div>
                   </Card>
-                )
+                </Link>
               ))}
             </div>
           )}
