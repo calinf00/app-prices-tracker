@@ -62,7 +62,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     for (const b64 of images) {
       const sizeKB = Math.round((b64.length * 0.75) / 1024);
       console.log(`[scanReceipt] immagine ${sizeKB}KB`);
-      if (sizeKB > 800) {
+      if (sizeKB > 1500) {
         throw new Error(
           `Immagine troppo grande (${sizeKB}KB). Riprova con una foto meno dettagliata o usa il ritaglio per selezionare solo lo scontrino.`,
         );
