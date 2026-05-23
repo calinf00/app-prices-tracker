@@ -204,6 +204,18 @@ export const scanReceipt = createServerFn({ method: "POST" })
     }
   });
 
+export const scanReceiptUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateScanFormData)
+  .handler(async ({ data, context }) => {
+    await enforceRateLimit(context.supabase, context.userId, "scanReceipt", 20, 24 * 3600_000);
+    const images = await Promise.all(
+      data.files.map(async (file) => Buffer.from(await file.arrayBuffer()).toString("base64")),
+    );
+    console.log("[scanReceipt] upload start, images count:", images.length);
+    return runReceiptScan(images);
+  });
+
 // Strip markdown code fences and extract the first JSON object/array.
 // Returns the parsed value or null if no valid JSON could be recovered.
 function extractJsonFromResponse(response: string): any | null {
