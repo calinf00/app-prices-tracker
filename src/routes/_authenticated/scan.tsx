@@ -56,8 +56,8 @@ type Item = {
 type Step = "capture" | "crop" | "preview" | "analyzing" | "review";
 
 type CapturedImage = {
-  file: File;        // compressed jpeg ready to upload
-  preview: string;   // data URL for thumbnail
+  file: File; // compressed jpeg ready to upload
+  preview: string; // data URL for thumbnail
 };
 
 const MAX_IMAGES = 5;
@@ -218,10 +218,7 @@ function ScanPage() {
     return runAnalyze(images);
   };
 
-  const handleCropConfirm = async (
-    pixelCrop: PixelCrop | null,
-    imageEl: HTMLImageElement,
-  ) => {
+  const handleCropConfirm = async (pixelCrop: PixelCrop | null, imageEl: HTMLImageElement) => {
     try {
       let working: File;
       if (pixelCrop && pixelCrop.width > 0 && pixelCrop.height > 0) {
@@ -252,14 +249,12 @@ function ScanPage() {
     }
   };
 
-  const removeImage = (i: number) =>
-    setImages((arr) => arr.filter((_, idx) => idx !== i));
+  const removeImage = (i: number) => setImages((arr) => arr.filter((_, idx) => idx !== i));
 
   const updateItem = (i: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
 
-  const removeItem = (i: number) =>
-    setItems((arr) => arr.filter((_, idx) => idx !== i));
+  const removeItem = (i: number) => setItems((arr) => arr.filter((_, idx) => idx !== i));
 
   const addEmptyItem = () =>
     setItems((arr) => [
@@ -347,9 +342,7 @@ function ScanPage() {
           notes: "Importato da scontrino",
         };
         console.log("[scan.save] inserting purchase", purchasePayload);
-        const { error: puErr } = await supabase
-          .from("purchases")
-          .insert(purchasePayload);
+        const { error: puErr } = await supabase.from("purchases").insert(purchasePayload);
         if (puErr) {
           console.error("[scan.save] purchase insert error", puErr);
           throw new Error(`Impossibile salvare l'acquisto "${cleanName}"`);
@@ -408,9 +401,7 @@ function ScanPage() {
                 }
               />
               {storeError && (
-                <p className="text-xs text-destructive mt-1">
-                  Inserisci il nome del negozio
-                </p>
+                <p className="text-xs text-destructive mt-1">Inserisci il nome del negozio</p>
               )}
               {storeSuggestOpen && storeMatches.length > 0 && (
                 <Card className="absolute z-20 left-0 right-0 mt-1 p-1 max-h-48 overflow-auto">
@@ -450,11 +441,7 @@ function ScanPage() {
                   Data non rilevata - inserisci manualmente
                 </p>
               )}
-              {dateIso && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isoToIt(dateIso)}
-                </p>
-              )}
+              {dateIso && <p className="text-xs text-muted-foreground mt-1">{isoToIt(dateIso)}</p>}
             </div>
 
             {/* Thumbnails strip */}
@@ -530,16 +517,15 @@ function ScanPage() {
                     </div>
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Unità</Label>
-                      <Select
-                        value={it.unit}
-                        onValueChange={(v) => updateItem(i, { unit: v })}
-                      >
+                      <Select value={it.unit} onValueChange={(v) => updateItem(i, { unit: v })}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {UNITS.map((u) => (
-                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -555,7 +541,9 @@ function ScanPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {CATEGORIES.map((c) => (
-                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -575,26 +563,18 @@ function ScanPage() {
             </Card>
           ))}
 
-          <Button
-            variant="outline"
-            className="w-full h-11 border-dashed"
-            onClick={addEmptyItem}
-          >
+          <Button variant="outline" className="w-full h-11 border-dashed" onClick={addEmptyItem}>
             <Plus className="h-4 w-4 mr-2" /> Aggiungi prodotto
           </Button>
         </div>
 
         {/* Footer */}
-        <div
-          className="fixed bottom-16 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50 shadow-lg"
-        >
+        <div className="fixed bottom-16 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50 shadow-lg">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {selectedCount} di {items.length} selezionati
             </span>
-            <span className="font-semibold">
-              Totale stimato: € {estimatedTotal.toFixed(2)}
-            </span>
+            <span className="font-semibold">Totale stimato: € {estimatedTotal.toFixed(2)}</span>
           </div>
           <div className="flex gap-2">
             <Button
@@ -610,9 +590,7 @@ function ScanPage() {
               onClick={save}
               disabled={saving || selectedCount === 0}
             >
-              {saving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Salva {selectedCount} {selectedCount === 1 ? "prodotto" : "prodotti"}
             </Button>
           </div>
@@ -639,11 +617,7 @@ function ScanPage() {
     <div className="space-y-4 pb-8">
       {step === "crop" && pendingPreview && (
         <Suspense fallback={null}>
-          <ReceiptCrop
-            src={pendingPreview}
-            onCancel={resetAll}
-            onConfirm={handleCropConfirm}
-          />
+          <ReceiptCrop src={pendingPreview} onCancel={resetAll} onConfirm={handleCropConfirm} />
         </Suspense>
       )}
       <input
@@ -745,11 +719,7 @@ function ScanPage() {
             >
               <RefreshCw className="h-4 w-4 mr-2" /> Annulla
             </Button>
-            <Button
-              className="flex-1 h-11"
-              onClick={analyze}
-              disabled={step === "analyzing"}
-            >
+            <Button className="flex-1 h-11" onClick={analyze} disabled={step === "analyzing"}>
               {step === "analyzing" ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analizzo...
@@ -775,9 +745,7 @@ function ScanPage() {
                   style={{ animationDelay: "0.3s" }}
                 />
               </div>
-              <p className="text-sm text-muted-foreground">
-                Sto analizzando lo scontrino... 🔍
-              </p>
+              <p className="text-sm text-muted-foreground">Sto analizzando lo scontrino... 🔍</p>
             </div>
           )}
 

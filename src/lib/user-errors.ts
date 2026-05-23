@@ -23,7 +23,10 @@ const SAFE_AI_MESSAGES = [
   "Nessun prodotto trovato nello scontrino",
 ];
 
-export function toUserMessage(err: unknown, fallback = "Si è verificato un errore. Riprova."): string {
+export function toUserMessage(
+  err: unknown,
+  fallback = "Si è verificato un errore. Riprova.",
+): string {
   // Always log the real error for debugging.
   // eslint-disable-next-line no-console
   console.error("[app error]", err);
