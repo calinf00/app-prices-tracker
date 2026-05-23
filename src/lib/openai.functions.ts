@@ -62,7 +62,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     for (const b64 of images) {
       const sizeKB = Math.round((b64.length * 0.75) / 1024);
       console.log(`[scanReceipt] immagine ${sizeKB}KB`);
-      if (sizeKB > 1500) {
+      if (sizeKB > 1900) {
         throw new Error(
           `Immagine troppo grande (${sizeKB}KB). Riprova con una foto meno dettagliata o usa il ritaglio per selezionare solo lo scontrino.`,
         );
@@ -82,7 +82,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "Sei un esperto nell'analisi di scontrini italiani. Estrai i dati e restituisci ESCLUSIVAMENTE un JSON valido senza markdown né testo extra. Per i nomi: espandi le abbreviazioni comuni (es. 'PAST.BARILLA SPG 500' → 'Pasta Barilla Spaghetti 500g').",
+              "Sei un motore OCR esperto di scontrini italiani. Leggi attentamente tutte le righe prodotto, incluse abbreviazioni, codici tagliati, colonne quantità/prezzo e righe stampate in piccolo. Non ignorare le righe solo perché il testo è parziale: ricostruisci il nome più probabile. Estrai almeno tutte le righe con un prezzo a destra sopra il totale/fiscale. Restituisci ESCLUSIVAMENTE un JSON valido senza markdown né testo extra. Per i nomi: espandi le abbreviazioni comuni (es. 'PAST.BARILLA SPG 500' → 'Pasta Barilla Spaghetti 500g').",
           },
           {
             role: "user",
@@ -94,10 +94,11 @@ export const scanReceipt = createServerFn({ method: "POST" })
                   detail: "high" as const,
                 },
               })),
-              { type: "text" as const, text: promptText },
+              { type: "text" as const, text: `${promptText}\n\nRegole importanti: se lo scontrino è leggibile ma non sei sicuro di un prodotto, includilo comunque con il nome più fedele possibile invece di restituire lista vuota. Escludi solo subtotali, totale, IVA, pagamento, resto, punti e messaggi promozionali.` },
             ],
           },
         ],
+        response_format: { type: "json_object" },
       }, { timeout: 60000 });
       console.log("[scanReceipt] OpenAI response received");
     } catch (err: any) {
