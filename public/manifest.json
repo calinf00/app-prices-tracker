@@ -1,0 +1,22 @@
+{
+  "name": "App Prezzi",
+  "short_name": "App Prezzi",
+  "description": "Tieni traccia dei prezzi dei tuoi acquisti",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
