@@ -25,7 +25,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
         {
           role: "system",
           content:
-            "Sei un assistente specializzato nell'analisi di scontrini italiani. Analizza l'immagine e restituisci ESCLUSIVAMENTE un JSON valido (senza markdown, senza testo aggiuntivo) con questa struttura: { \"negozio\": string, \"data\": string (formato DD/MM/YYYY o vuota se non visibile), \"prodotti\": [ { \"nome\": string, \"quantita\": number, \"unita\": string, \"prezzo_unitario\": number, \"prezzo_totale\": number } ] }",
+            "Sei un esperto nell'analisi di scontrini italiani. Il tuo compito è estrarre le informazioni dallo scontrino e restituire ESCLUSIVAMENTE un JSON valido senza markdown. Per i nomi dei prodotti: espandi le abbreviazioni comuni degli scontrini italiani nel nome completo e comprensibile (es. 'PAST.BARILLA SPG 500' diventa 'Pasta Barilla Spaghetti 500g', 'LATT.PARMALAT PS' diventa 'Latte Parmalat Parzialmente Scremato'). Usa il contesto e la logica per completare nomi troncati. Struttura JSON richiesta: { negozio: string, data: string (formato DD/MM/YYYY, stringa vuota se non visibile), totale: number, prodotti: [ { nome_originale: string (testo esatto sullo scontrino), nome_completo: string (nome espanso e comprensibile), quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }",
         },
         {
           role: "user",
@@ -41,30 +41,37 @@ export const scanReceipt = createServerFn({ method: "POST" })
       const parsed = JSON.parse(raw) as {
         negozio?: string;
         data?: string;
+        totale?: number;
         prodotti?: Array<{
           nome?: string;
+          nome_originale?: string;
+          nome_completo?: string;
           quantita?: number;
           unita?: string;
           prezzo_unitario?: number;
           prezzo_totale?: number;
+          categoria_suggerita?: string;
         }>;
       };
-      // Convert DD/MM/YYYY -> YYYY-MM-DD for DB compatibility
       let isoDate: string | null = null;
       const m = (parsed.data ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m) isoDate = `${m[3]}-${m[2]}-${m[1]}`;
       return {
         store_name: parsed.negozio?.trim() || null,
         purchase_date: isoDate,
+        total: Number(parsed.totale) || null,
         items: (parsed.prodotti ?? []).map((p) => ({
-          name: (p.nome ?? "").trim(),
+          name_original: (p.nome_originale ?? p.nome ?? "").trim(),
+          name_full: (p.nome_completo ?? p.nome_originale ?? p.nome ?? "").trim(),
           quantity: Number(p.quantita) || 1,
-          unit: p.unita?.trim() || null,
+          unit: p.unita?.trim() || "pz",
           price: Number(p.prezzo_unitario ?? p.prezzo_totale) || 0,
-        })).filter((it) => it.name),
+          price_total: Number(p.prezzo_totale) || 0,
+          category: p.categoria_suggerita?.trim() || "Altro",
+        })).filter((it) => it.name_full),
       };
     } catch {
-      return { store_name: null, purchase_date: null, items: [] };
+      return { store_name: null, purchase_date: null, total: null, items: [] };
     }
   });
 
