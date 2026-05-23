@@ -43,13 +43,15 @@ async function enforceRateLimit(
   await supabase.from("ai_rate_limits").insert({ user_id: userId, fn_name: fnName });
 }
 
-const scanInput = z.object({
-  // Accept either a single image (legacy) or an array of up to 5 images.
-  imageBase64: z.string().min(20).max(2_800_000).optional(),
-  imagesBase64: z.array(z.string().min(20).max(2_800_000)).min(1).max(5).optional(),
-}).refine((v) => !!v.imageBase64 || (v.imagesBase64 && v.imagesBase64.length > 0), {
-  message: "Almeno un'immagine richiesta",
-});
+const scanInput = z
+  .object({
+    // Accept either a single image (legacy) or an array of up to 5 images.
+    imageBase64: z.string().min(20).max(2_800_000).optional(),
+    imagesBase64: z.array(z.string().min(20).max(2_800_000)).min(1).max(5).optional(),
+  })
+  .refine((v) => !!v.imageBase64 || (v.imagesBase64 && v.imagesBase64.length > 0), {
+    message: "Almeno un'immagine richiesta",
+  });
 
 export const scanReceipt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -62,7 +64,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     for (const b64 of images) {
       const sizeKB = Math.round((b64.length * 0.75) / 1024);
       console.log(`[scanReceipt] immagine ${sizeKB}KB`);
-      if (sizeKB > 1500) {
+      if (sizeKB > 1900) {
         throw new Error(
           `Immagine troppo grande (${sizeKB}KB). Riprova con una foto meno dettagliata o usa il ritaglio per selezionare solo lo scontrino.`,
         );
@@ -75,30 +77,37 @@ export const scanReceipt = createServerFn({ method: "POST" })
     let completion;
     try {
       console.log("[scanReceipt] calling OpenAI...");
-      completion = await client.chat.completions.create({
-        model: "gpt-4o",
-        max_tokens: 4000,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Sei un esperto nell'analisi di scontrini italiani. Estrai i dati e restituisci ESCLUSIVAMENTE un JSON valido senza markdown né testo extra. Per i nomi: espandi le abbreviazioni comuni (es. 'PAST.BARILLA SPG 500' → 'Pasta Barilla Spaghetti 500g').",
-          },
-          {
-            role: "user",
-            content: [
-              ...images.map((b64) => ({
-                type: "image_url" as const,
-                image_url: {
-                  url: `data:image/jpeg;base64,${b64}`,
-                  detail: "high" as const,
+      completion = await client.chat.completions.create(
+        {
+          model: "gpt-4o",
+          max_tokens: 4000,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Sei un motore OCR esperto di scontrini italiani. Leggi attentamente tutte le righe prodotto, incluse abbreviazioni, codici tagliati, colonne quantità/prezzo e righe stampate in piccolo. Non ignorare le righe solo perché il testo è parziale: ricostruisci il nome più probabile. Estrai almeno tutte le righe con un prezzo a destra sopra il totale/fiscale. Restituisci ESCLUSIVAMENTE un JSON valido senza markdown né testo extra. Per i nomi: espandi le abbreviazioni comuni (es. 'PAST.BARILLA SPG 500' → 'Pasta Barilla Spaghetti 500g').",
+            },
+            {
+              role: "user",
+              content: [
+                ...images.map((b64) => ({
+                  type: "image_url" as const,
+                  image_url: {
+                    url: `data:image/jpeg;base64,${b64}`,
+                    detail: "high" as const,
+                  },
+                })),
+                {
+                  type: "text" as const,
+                  text: `${promptText}\n\nRegole importanti: se lo scontrino è leggibile ma non sei sicuro di un prodotto, includilo comunque con il nome più fedele possibile invece di restituire lista vuota. Escludi solo subtotali, totale, IVA, pagamento, resto, punti e messaggi promozionali.`,
                 },
-              })),
-              { type: "text" as const, text: promptText },
-            ],
-          },
-        ],
-      }, { timeout: 60000 });
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+        },
+        { timeout: 60000 },
+      );
       console.log("[scanReceipt] OpenAI response received");
     } catch (err: any) {
       console.error("[scanReceipt] error:", err?.message, err?.status);
@@ -133,15 +142,17 @@ export const scanReceipt = createServerFn({ method: "POST" })
         store_name: parsed.negozio?.trim() || null,
         purchase_date: isoDate,
         total: Number(parsed.totale) || null,
-        items: (parsed.prodotti ?? []).map((p) => ({
-          name_original: (p.nome_originale ?? p.nome ?? "").trim(),
-          name_full: (p.nome_completo ?? p.nome_originale ?? p.nome ?? "").trim(),
-          quantity: Number(p.quantita) || 1,
-          unit: p.unita?.trim() || "pz",
-          price: Number(p.prezzo_unitario ?? p.prezzo_totale) || 0,
-          price_total: Number(p.prezzo_totale) || 0,
-          category: p.categoria_suggerita?.trim() || "Altro",
-        })).filter((it) => it.name_full),
+        items: (parsed.prodotti ?? [])
+          .map((p) => ({
+            name_original: (p.nome_originale ?? p.nome ?? "").trim(),
+            name_full: (p.nome_completo ?? p.nome_originale ?? p.nome ?? "").trim(),
+            quantity: Number(p.quantita) || 1,
+            unit: p.unita?.trim() || "pz",
+            price: Number(p.prezzo_unitario ?? p.prezzo_totale) || 0,
+            price_total: Number(p.prezzo_totale) || 0,
+            category: p.categoria_suggerita?.trim() || "Altro",
+          }))
+          .filter((it) => it.name_full),
       };
       console.log("[scanReceipt] parsed items:", result.items.length);
       return result;
@@ -292,7 +303,10 @@ export const smartShoppingList = createServerFn({ method: "POST" })
     (purchases ?? []).forEach((p: any) => {
       const prod = productsById.get(p.product_id);
       if (!prod) return;
-      const entry = byProduct.get(p.product_id) ?? { name: String(prod.name), dates: [] as string[] };
+      const entry = byProduct.get(p.product_id) ?? {
+        name: String(prod.name),
+        dates: [] as string[],
+      };
       entry.dates.push(String(p.purchase_date));
       byProduct.set(p.product_id, entry);
     });
