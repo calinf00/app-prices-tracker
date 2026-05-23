@@ -464,7 +464,7 @@ function ScanPage() {
         </div>
 
         {/* Items list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-40">
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-56">
           {items.map((it, i) => (
             <Card key={i} className="p-3 space-y-2">
               <div className="flex items-start gap-2">
