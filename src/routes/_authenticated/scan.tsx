@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -7,50 +7,81 @@ import {
   Image as ImageIcon,
   Loader2,
   RefreshCw,
-  Save,
   Sparkles,
   AlertTriangle,
-  CheckCircle2,
+  Trash2,
+  Plus,
+  X,
+  ZoomIn,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { scanReceipt } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { CATEGORIES, UNITS } from "@/lib/categories";
 
 export const Route = createFileRoute("/_authenticated/scan")({
   component: ScanPage,
 });
 
 type Item = {
-  name: string;
+  name_original: string;
+  name_full: string;
   quantity: number;
-  unit: string | null;
+  unit: string;
   price: number;
+  category: string;
   selected: boolean;
-  match?: { id: string; name: string } | null;
+};
+
+type Step = "capture" | "preview" | "analyzing" | "review";
+
+// Convert ISO YYYY-MM-DD to DD/MM/YYYY
+const isoToIt = (iso: string) => {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+};
+const itToIso = (it: string) => {
+  const m = it.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
 };
 
 function ScanPage() {
+  const navigate = useNavigate();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
+  const [step, setStep] = useState<Step>("capture");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [base64, setBase64] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [store, setStore] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [storeDetected, setStoreDetected] = useState(true);
+  const [dateIso, setDateIso] = useState("");
+  const [dateDetected, setDateDetected] = useState(true);
   const [items, setItems] = useState<Item[]>([]);
+  const [zoom, setZoom] = useState(false);
+  const [storeSuggestOpen, setStoreSuggestOpen] = useState(false);
 
   const scan = useServerFn(scanReceipt);
   const qc = useQueryClient();
 
+  // Recent scans (history)
   const recent = useQuery({
     queryKey: ["recent-scans"],
     queryFn: async () => {
@@ -72,100 +103,178 @@ function ScanPage() {
     },
   });
 
+  // Known stores for autocomplete
+  const knownStores = useQuery({
+    queryKey: ["known-stores"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("purchases")
+        .select("store_name")
+        .not("store_name", "is", null)
+        .limit(500);
+      const set = new Set<string>();
+      (data ?? []).forEach((r: any) => r.store_name && set.add(r.store_name));
+      return Array.from(set).sort();
+    },
+  });
+
+  const storeMatches = useMemo(() => {
+    const q = store.trim().toLowerCase();
+    if (!q) return [];
+    return (knownStores.data ?? [])
+      .filter((s) => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+      .slice(0, 5);
+  }, [store, knownStores.data]);
+
   const handleFile = (file: File) => {
     setError(null);
-    setItems([]);
+    setImageFile(file);
     const r = new FileReader();
     r.onload = () => {
       const dataUrl = r.result as string;
       setPreview(dataUrl);
       setBase64(dataUrl.split(",")[1] ?? "");
+      setStep("preview");
     };
     r.readAsDataURL(file);
   };
 
-  const reset = () => {
+  const resetAll = () => {
+    setStep("capture");
+    setImageFile(null);
     setPreview(null);
     setBase64(null);
-    setItems([]);
     setError(null);
+    setItems([]);
+    setStore("");
+    setDateIso("");
+    setStoreDetected(true);
+    setDateDetected(true);
   };
 
   const analyze = async () => {
     if (!base64) return;
-    setAnalyzing(true);
+    setStep("analyzing");
     setError(null);
-    setItems([]);
     try {
       const result = await scan({ data: { imageBase64: base64 } });
-      setStore(result.store_name ?? "");
-      if (result.purchase_date) setDate(result.purchase_date);
-      const parsed: Item[] = (result.items ?? []).map((it) => ({
-        ...it,
+      const detectedStore = result.store_name ?? "";
+      setStore(detectedStore);
+      setStoreDetected(!!detectedStore);
+      setDateIso(result.purchase_date ?? "");
+      setDateDetected(!!result.purchase_date);
+      const parsed: Item[] = (result.items ?? []).map((it: any) => ({
+        name_original: it.name_original ?? "",
+        name_full: it.name_full ?? it.name_original ?? "",
+        quantity: it.quantity || 1,
+        unit: (UNITS as readonly string[]).includes(it.unit) ? it.unit : "pz",
+        price: it.price || 0,
+        category: CATEGORIES.includes(it.category) ? it.category : "Altro",
         selected: true,
       }));
-      // Match against existing products
-      await Promise.all(
-        parsed.map(async (item) => {
-          if (!item.name) return;
-          const { data } = await supabase
-            .from("products")
-            .select("id, name")
-            .ilike("name", `%${item.name.slice(0, 20)}%`)
-            .limit(1);
-          if (data && data[0]) item.match = { id: data[0].id, name: data[0].name };
-        }),
-      );
       setItems(parsed);
       if (parsed.length === 0) {
         setError("Nessun prodotto riconosciuto. Riprova con un'immagine più nitida.");
+        setStep("preview");
       } else {
-        toast.success(`Trovati ${parsed.length} prodotti`);
+        setStep("review");
       }
     } catch (e: any) {
       setError(e?.message ?? "Errore durante l'analisi dello scontrino");
-    } finally {
-      setAnalyzing(false);
+      setStep("preview");
     }
   };
 
   const updateItem = (i: number, patch: Partial<Item>) =>
     setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
 
+  const removeItem = (i: number) =>
+    setItems((arr) => arr.filter((_, idx) => idx !== i));
+
+  const addEmptyItem = () =>
+    setItems((arr) => [
+      ...arr,
+      {
+        name_original: "",
+        name_full: "",
+        quantity: 1,
+        unit: "pz",
+        price: 0,
+        category: "Altro",
+        selected: true,
+      },
+    ]);
+
+  const selectedCount = items.filter((i) => i.selected).length;
+  const estimatedTotal = items
+    .filter((i) => i.selected)
+    .reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
+
   const save = async () => {
-    const selected = items.filter((it) => it.selected && it.name.trim());
+    const selected = items.filter((it) => it.selected && it.name_full.trim());
     if (selected.length === 0) {
       toast.error("Nessun prodotto selezionato");
       return;
     }
+    if (!dateIso) {
+      toast.error("Inserisci la data dell'acquisto");
+      return;
+    }
     setSaving(true);
     try {
+      // Upload receipt image first (associated only when user confirms save)
+      let receiptUrl: string | null = null;
+      if (imageFile) {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData.user?.id;
+        if (uid) {
+          const ext = (imageFile.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `${uid}/${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from("receipts")
+            .upload(path, imageFile, { contentType: imageFile.type || "image/jpeg" });
+          if (!upErr) receiptUrl = path;
+        }
+      }
+
       for (const item of selected) {
-        let productId = item.match?.id;
+        const cleanName = item.name_full.trim();
+        // Try to find existing product (case-insensitive exact match preferred, else ilike)
+        const { data: matches } = await supabase
+          .from("products")
+          .select("id, name")
+          .ilike("name", cleanName)
+          .limit(1);
+        let productId = matches?.[0]?.id;
         if (!productId) {
           const { data: created, error: pErr } = await supabase
             .from("products")
-            .insert({ name: item.name.trim() })
+            .insert({ name: cleanName, category: item.category })
             .select("id")
             .single();
           if (pErr) throw pErr;
           productId = created.id;
         }
-        const { error: puErr } = await supabase.from("purchases").insert({
+        const purchasePayload: any = {
           product_id: productId,
           store_name: store.trim() || null,
           price: item.price,
           quantity: item.quantity || 1,
           unit: item.unit,
-          purchase_date: date,
-        });
+          purchase_date: dateIso,
+        };
+        if (receiptUrl) purchasePayload.receipt_url = receiptUrl;
+        const { error: puErr } = await supabase
+          .from("purchases")
+          .insert(purchasePayload);
         if (puErr) throw puErr;
       }
-      toast.success(`${selected.length} ${selected.length === 1 ? "acquisto salvato" : "acquisti salvati"}`);
-      reset();
-      setStore("");
+      toast.success(`✅ ${selected.length} prodotti salvati con successo`);
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+      qc.invalidateQueries({ queryKey: ["known-stores"] });
+      resetAll();
+      navigate({ to: "/" });
     } catch (e: any) {
       toast.error(e?.message ?? "Errore salvataggio");
     } finally {
@@ -173,9 +282,246 @@ function ScanPage() {
     }
   };
 
+  // -------- RENDER --------
+
+  // Full-screen review mode
+  if (step === "review") {
+    return (
+      <div className="-mx-4 -my-2 min-h-[calc(100vh-6rem)] bg-background flex flex-col">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-background border-b">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <h1 className="text-lg font-semibold">Revisione scontrino</h1>
+            <Button size="icon" variant="ghost" onClick={resetAll} aria-label="Annulla">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="px-4 pb-3 space-y-3">
+            {/* Negozio + autocomplete */}
+            <div className="relative">
+              <Label className="text-xs">Negozio</Label>
+              <Input
+                value={store}
+                onChange={(e) => {
+                  setStore(e.target.value);
+                  setStoreSuggestOpen(true);
+                }}
+                onFocus={() => setStoreSuggestOpen(true)}
+                onBlur={() => setTimeout(() => setStoreSuggestOpen(false), 150)}
+                placeholder="Es. Esselunga"
+                className={!storeDetected ? "border-orange-500" : ""}
+              />
+              {storeSuggestOpen && storeMatches.length > 0 && (
+                <Card className="absolute z-20 left-0 right-0 mt-1 p-1 max-h-48 overflow-auto">
+                  {storeMatches.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setStore(s);
+                        setStoreSuggestOpen(false);
+                      }}
+                      className="block w-full text-left px-2 py-2 text-sm rounded hover:bg-muted"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </Card>
+              )}
+            </div>
+
+            {/* Data */}
+            <div>
+              <Label className="text-xs">Data acquisto</Label>
+              <Input
+                type="date"
+                value={dateIso}
+                onChange={(e) => {
+                  setDateIso(e.target.value);
+                  setDateDetected(true);
+                }}
+                className={!dateDetected || !dateIso ? "border-orange-500" : ""}
+              />
+              {(!dateDetected || !dateIso) && (
+                <p className="text-xs text-orange-500 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Data non rilevata - inserisci manualmente
+                </p>
+              )}
+              {dateIso && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isoToIt(dateIso)}
+                </p>
+              )}
+            </div>
+
+            {/* Thumbnail */}
+            {preview && (
+              <button
+                type="button"
+                onClick={() => setZoom(true)}
+                className="relative block rounded-md overflow-hidden border bg-muted h-20 w-full"
+              >
+                <img
+                  src={preview}
+                  alt="scontrino"
+                  className="h-full w-full object-cover opacity-80"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-xs gap-1">
+                  <ZoomIn className="h-4 w-4" /> Tocca per ingrandire
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Items list */}
+        <div className="flex-1 px-4 py-3 space-y-2 pb-32">
+          {items.map((it, i) => (
+            <Card key={i} className="p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={it.selected}
+                  onCheckedChange={(c) => updateItem(i, { selected: !!c })}
+                  className="mt-2"
+                />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <Input
+                    value={it.name_full}
+                    onChange={(e) => updateItem(i, { name_full: e.target.value })}
+                    placeholder="Nome prodotto"
+                    className="font-medium"
+                  />
+                  {it.name_original && it.name_original !== it.name_full && (
+                    <p className="text-[11px] text-muted-foreground pl-1">
+                      Originale: {it.name_original}
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Prezzo unit. €</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={it.price}
+                        onChange={(e) => updateItem(i, { price: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Quantità</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={it.quantity}
+                        onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Unità</Label>
+                      <Select
+                        value={it.unit}
+                        onValueChange={(v) => updateItem(i, { unit: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNITS.map((u) => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                      <Select
+                        value={it.category}
+                        onValueChange={(v) => updateItem(i, { category: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => removeItem(i)}
+                  aria-label="Rimuovi"
+                  className="text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          ))}
+
+          <Button
+            variant="outline"
+            className="w-full h-11 border-dashed"
+            onClick={addEmptyItem}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Aggiungi prodotto
+          </Button>
+        </div>
+
+        {/* Footer */}
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-10">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              {selectedCount} di {items.length} selezionati
+            </span>
+            <span className="font-semibold">
+              Totale stimato: € {estimatedTotal.toFixed(2)}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 h-11"
+              onClick={resetAll}
+              disabled={saving}
+            >
+              Annulla
+            </Button>
+            <Button
+              className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={save}
+              disabled={saving || selectedCount === 0}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Salva {selectedCount} {selectedCount === 1 ? "prodotto" : "prodotti"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Zoom dialog */}
+        <Dialog open={zoom} onOpenChange={setZoom}>
+          <DialogContent className="max-w-3xl p-2">
+            {preview && (
+              <img src={preview} alt="scontrino" className="w-full h-auto rounded" />
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Capture / preview / analyzing
   return (
     <div className="space-y-4 pb-8">
-      {/* Hidden inputs */}
       <input
         ref={cameraRef}
         type="file"
@@ -200,8 +546,7 @@ function ScanPage() {
         }}
       />
 
-      {/* Input mode */}
-      {!preview && (
+      {step === "capture" && (
         <div className="grid grid-cols-2 gap-3">
           <Button
             size="lg"
@@ -209,7 +554,7 @@ function ScanPage() {
             onClick={() => cameraRef.current?.click()}
           >
             <Camera className="h-8 w-8" />
-            <span>Scatta foto</span>
+            <span>📷 Scatta foto</span>
           </Button>
           <Button
             size="lg"
@@ -218,48 +563,64 @@ function ScanPage() {
             onClick={() => galleryRef.current?.click()}
           >
             <ImageIcon className="h-8 w-8" />
-            <span>Carica immagine</span>
+            <span>🖼️ Carica dalla galleria</span>
           </Button>
         </div>
       )}
 
-      {/* Preview + analyze */}
-      {preview && (
+      {(step === "preview" || step === "analyzing") && preview && (
         <Card className="p-3 space-y-3">
-          <div className="relative">
-            <img src={preview} alt="scontrino" className="w-full max-h-80 object-contain rounded-md bg-muted" />
-          </div>
+          <img
+            src={preview}
+            alt="scontrino"
+            className="w-full max-h-80 object-contain rounded-md bg-muted"
+          />
           <div className="flex gap-2">
             <Button
               variant="outline"
-              className="flex-1"
-              onClick={reset}
-              disabled={analyzing}
+              className="flex-1 h-11"
+              onClick={resetAll}
+              disabled={step === "analyzing"}
             >
-              <RefreshCw className="h-4 w-4 mr-2" /> Rifai
+              <RefreshCw className="h-4 w-4 mr-2" /> Rifare foto
             </Button>
-            {items.length === 0 && (
-              <Button className="flex-1" onClick={analyze} disabled={analyzing}>
-                {analyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analizzo...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" /> Analizza scontrino
-                  </>
-                )}
-              </Button>
-            )}
+            <Button
+              className="flex-1 h-11"
+              onClick={analyze}
+              disabled={step === "analyzing"}
+            >
+              {step === "analyzing" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analizzo...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" /> Analizza scontrino
+                </>
+              )}
+            </Button>
           </div>
 
-          {analyzing && (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Sto analizzando lo scontrino...
+          {step === "analyzing" && (
+            <div className="flex flex-col items-center justify-center gap-3 py-6">
+              <div className="flex gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce" />
+                <span
+                  className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce"
+                  style={{ animationDelay: "0.15s" }}
+                />
+                <span
+                  className="h-2.5 w-2.5 rounded-full bg-primary animate-bounce"
+                  style={{ animationDelay: "0.3s" }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Sto analizzando lo scontrino... 🔍
+              </p>
             </div>
           )}
 
-          {error && (
+          {error && step === "preview" && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
               <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -273,113 +634,41 @@ function ScanPage() {
         </Card>
       )}
 
-      {/* Results */}
-      {items.length > 0 && (
-        <>
-          <Card className="p-3 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Negozio</Label>
-                <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Es. Esselunga" />
-              </div>
-              <div>
-                <Label className="text-xs">Data</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-            </div>
-          </Card>
-
-          <div className="space-y-2">
-            {items.map((it, i) => (
-              <Card key={i} className="p-3 space-y-2">
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    checked={it.selected}
-                    onCheckedChange={(c) => updateItem(i, { selected: !!c })}
-                    className="mt-2"
-                  />
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <Input
-                      value={it.name}
-                      onChange={(e) => updateItem(i, { name: e.target.value })}
-                      placeholder="Nome prodotto"
-                    />
-                    {it.match && (
-                      <div className="flex items-center gap-1 text-xs text-emerald-500">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Corrispondenza: <span className="font-medium">{it.match.name}</span>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-[10px] text-muted-foreground">Quantità</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={it.quantity}
-                          onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-[10px] text-muted-foreground">Prezzo unitario €</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.price}
-                          onChange={(e) => updateItem(i, { price: Number(e.target.value) })}
-                        />
-                      </div>
+      {/* History */}
+      {step === "capture" && (
+        <div className="pt-4">
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1">
+            Ultime scansioni
+          </h3>
+          {recent.isLoading ? (
+            <p className="text-xs text-muted-foreground px-1">Caricamento...</p>
+          ) : (recent.data ?? []).length === 0 ? (
+            <Card className="p-4 text-center text-sm text-muted-foreground">
+              Nessuna scansione effettuata.
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {recent.data!.map((s, i) => (
+                <Card key={i} className="p-3 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{s.store ?? "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(s.date).toLocaleDateString("it-IT", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          <Button className="w-full" onClick={save} disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Salva selezionati ({items.filter((i) => i.selected).length})
-          </Button>
-        </>
-      )}
-
-      {/* History */}
-      <div className="pt-4">
-        <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1">
-          Ultime scansioni
-        </h3>
-        {recent.isLoading ? (
-          <p className="text-xs text-muted-foreground px-1">Caricamento...</p>
-        ) : (recent.data ?? []).length === 0 ? (
-          <Card className="p-4 text-center text-sm text-muted-foreground">
-            Nessuna scansione effettuata.
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {recent.data!.map((s, i) => (
-              <Card key={i} className="p-3 flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium truncate">{s.store ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(s.date).toLocaleDateString("it-IT", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                  <div className="text-xs text-muted-foreground shrink-0">
+                    {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
                   </div>
-                </div>
-                <div className="text-xs text-muted-foreground shrink-0">
-                  {s.count} {s.count === 1 ? "prodotto" : "prodotti"}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
