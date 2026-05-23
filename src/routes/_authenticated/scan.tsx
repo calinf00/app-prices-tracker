@@ -564,8 +564,7 @@ function ScanPage() {
 
         {/* Footer */}
         <div
-          className="fixed bottom-0 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50"
-          style={{ paddingBottom: "max(12px, calc(env(safe-area-inset-bottom) + 80px))" }}
+          className="fixed bottom-16 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50 shadow-lg"
         >
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
