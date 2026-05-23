@@ -171,40 +171,14 @@ export const scanReceipt = createServerFn({ method: "POST" })
       throw new Error("L'AI non ha restituito un formato valido, riprova");
     }
     try {
-      const parsed = cleaned as {
-        negozio?: string;
-        data?: string;
-        totale?: number;
-        prodotti?: Array<{
-          nome?: string;
-          nome_originale?: string;
-          nome_completo?: string;
-          quantita?: number;
-          unita?: string;
-          prezzo_unitario?: number;
-          prezzo_totale?: number;
-          categoria_suggerita?: string;
-        }>;
-      };
-      let isoDate: string | null = null;
-      const m = (parsed.data ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-      if (m) isoDate = `${m[3]}-${m[2]}-${m[1]}`;
-      const result = {
-        store_name: parsed.negozio?.trim() || null,
-        purchase_date: isoDate,
-        total: Number(parsed.totale) || null,
-        items: (parsed.prodotti ?? [])
-          .map((p) => ({
-            name_original: (p.nome_originale ?? p.nome ?? "").trim(),
-            name_full: (p.nome_completo ?? p.nome_originale ?? p.nome ?? "").trim(),
-            quantity: Number(p.quantita) || 1,
-            unit: p.unita?.trim() || "pz",
-            price: Number(p.prezzo_unitario ?? p.prezzo_totale) || 0,
-            price_total: Number(p.prezzo_totale) || 0,
-            category: p.categoria_suggerita?.trim() || "Altro",
-          }))
-          .filter((it) => it.name_full),
-      };
+      let result = normalizeReceiptResult(cleaned as ReceiptAIResponse);
+      if (result.items.length === 0) {
+        console.log("[scanReceipt] zero items, retrying fallback OCR...");
+        const retryRaw = await requestReceiptExtraction(client, images, promptText, true);
+        console.log("[scanReceipt] fallback raw response:", retryRaw);
+        const retryCleaned = extractJsonFromResponse(retryRaw);
+        if (retryCleaned) result = normalizeReceiptResult(retryCleaned as ReceiptAIResponse);
+      }
       console.log("[scanReceipt] parsed items:", result.items.length);
       return result;
     } catch (err) {
