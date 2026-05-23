@@ -13,7 +13,6 @@ import {
   Trash2,
   Plus,
   X,
-  ZoomIn,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ import { toast } from "sonner";
 import { scanReceipt } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
-import { compressImage, cropImageToFile, fileToBase64 } from "@/lib/image-compress";
+import { compressImage, cropImageToFile } from "@/lib/image-compress";
 import { lazy, Suspense } from "react";
 const ReceiptCrop = lazy(() =>
   import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
