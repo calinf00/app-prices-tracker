@@ -1,4 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useState, type FormEvent } from "react";
 import { ShoppingBasket } from "lucide-react";
 import { toast } from "sonner";
@@ -27,7 +28,7 @@ function AuthPage() {
     setSubmitting(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setSubmitting(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(toUserMessage(error));
     else toast.success("Accesso effettuato");
   };
 
@@ -40,7 +41,7 @@ function AuthPage() {
       options: { emailRedirectTo: window.location.origin },
     });
     setSubmitting(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(toUserMessage(error));
     else toast.success("Controlla la tua email per confermare la registrazione");
   };
 

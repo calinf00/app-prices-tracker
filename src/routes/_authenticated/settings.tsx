@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useEffect, useMemo, useState } from "react";
 import { LogOut, Moon, Sun, Plus, X, Download, Store, Tag, User as UserIcon, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -69,7 +70,7 @@ function SettingsPage() {
     setSavingName(true);
     const { error } = await supabase.auth.updateUser({ data: { full_name: name.trim() } });
     setSavingName(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(toUserMessage(error));
     else toast.success("Nome aggiornato");
   };
 
@@ -150,7 +151,7 @@ function SettingsPage() {
       URL.revokeObjectURL(url);
       toast.success(`Esportati ${rows.length} acquisti`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore nell'esportazione");
+      toast.error(toUserMessage(e, "Errore nell'esportazione"));
     } finally {
       setExporting(false);
     }
@@ -158,7 +159,7 @@ function SettingsPage() {
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) toast.error(error.message);
+    if (error) toast.error(toUserMessage(error));
     else {
       toast.success("Disconnesso");
       navigate({ to: "/auth" });

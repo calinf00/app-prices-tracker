@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
@@ -105,7 +106,7 @@ function ProductDetailPage() {
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       toast.success("Acquisto eliminato");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Errore"),
+    onError: (e: any) => toast.error(toUserMessage(e, "Errore")),
   });
 
   const stats = useMemo(() => {
@@ -425,7 +426,7 @@ function PurchaseDialog({
       toast.success(isEdit ? "Acquisto aggiornato" : "Acquisto aggiunto");
       onSaved();
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e, "Errore"));
     } finally {
       setSaving(false);
     }

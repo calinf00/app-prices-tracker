@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { toUserMessage } from "@/lib/user-errors";
 import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -276,7 +277,7 @@ function ScanPage() {
       resetAll();
       navigate({ to: "/" });
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore salvataggio");
+      toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
     }
