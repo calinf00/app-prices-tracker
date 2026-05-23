@@ -181,7 +181,7 @@ function ScanPage() {
         setStep("review");
       }
     } catch (e: any) {
-      setError(e?.message ?? "Errore durante l'analisi dello scontrino");
+      setError(toUserMessage(e, "Errore durante l'analisi dello scontrino"));
       setStep("preview");
     }
   };
