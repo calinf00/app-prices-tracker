@@ -152,6 +152,51 @@ async function requestReceiptExtraction(
   return choice?.message?.content ?? "";
 }
 
+async function runReceiptScan(images: string[]) {
+  const client = getClient();
+  console.log("[scanReceipt] start, images count:", images.length);
+  for (const b64 of images) {
+    const sizeKB = Math.round((b64.length * 0.75) / 1024);
+    console.log(`[scanReceipt] immagine ${sizeKB}KB`);
+    if (sizeKB > 1900) {
+      throw new Error(
+        `Immagine troppo grande (${sizeKB}KB). Riprova con una foto meno dettagliata o usa il ritaglio per selezionare solo lo scontrino.`,
+      );
+    }
+  }
+  const promptText =
+    images.length > 1
+      ? "Queste immagini appartengono allo STESSO scontrino italiano (parti diverse o pagine multiple). Analizzale tutte insieme ed estrai un UNICO elenco prodotti, eliminando i duplicati. Restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }"
+      : "Analizza questo scontrino italiano e restituisci SOLO un JSON valido senza markdown con questa struttura: { negozio: string, data: string (DD/MM/YYYY), totale: number, prodotti: [ { nome_originale: string, nome_completo: string, quantita: number, unita: string (pz/kg/g/l/ml), prezzo_unitario: number, prezzo_totale: number, categoria_suggerita: string } ] }";
+  let raw = "";
+  try {
+    console.log("[scanReceipt] calling OpenAI...");
+    raw = await requestReceiptExtraction(client, images, promptText);
+    console.log("[scanReceipt] OpenAI response received");
+  } catch (err: any) {
+    console.error("[scanReceipt] error:", err?.message, err?.status);
+    throw new Error("Errore di connessione all'AI");
+  }
+  console.log("[scanReceipt] raw response:", raw);
+  const cleaned = extractJsonFromResponse(raw);
+  if (!cleaned) throw new Error("L'AI non ha restituito un formato valido, riprova");
+  try {
+    let result = normalizeReceiptResult(cleaned as ReceiptAIResponse);
+    if (result.items.length === 0) {
+      console.log("[scanReceipt] zero items, retrying fallback OCR...");
+      const retryRaw = await requestReceiptExtraction(client, images, promptText, true);
+      console.log("[scanReceipt] fallback raw response:", retryRaw);
+      const retryCleaned = extractJsonFromResponse(retryRaw);
+      if (retryCleaned) result = normalizeReceiptResult(retryCleaned as ReceiptAIResponse);
+    }
+    console.log("[scanReceipt] parsed items:", result.items.length);
+    return result;
+  } catch (err) {
+    console.error("[scanReceipt] shape error:", err);
+    throw new Error("L'AI non ha restituito un formato valido, riprova");
+  }
+}
+
 export const scanReceipt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => scanInput.parse(input))
