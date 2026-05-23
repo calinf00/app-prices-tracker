@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { scanReceipt } from "@/lib/openai.functions";
+import { scanReceiptUpload } from "@/lib/openai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
 import { compressImage, cropImageToFile } from "@/lib/image-compress";
@@ -58,7 +58,6 @@ type Step = "capture" | "crop" | "preview" | "analyzing" | "review";
 type CapturedImage = {
   file: File;        // compressed jpeg ready to upload
   preview: string;   // data URL for thumbnail
-  base64: string;    // raw base64 for OpenAI
 };
 
 const MAX_IMAGES = 5;
@@ -97,7 +96,7 @@ function ScanPage() {
   const [storeSuggestOpen, setStoreSuggestOpen] = useState(false);
   const [storeError, setStoreError] = useState(false);
 
-  const scan = useServerFn(scanReceipt);
+  const scan = useServerFn(scanReceiptUpload);
   const qc = useQueryClient();
 
   // Recent scans (history)
@@ -184,12 +183,9 @@ function ScanPage() {
     setStep("analyzing");
     setError(null);
     try {
-      const result = await scan({
-        data:
-          imgs.length === 1
-            ? { imageBase64: imgs[0].base64 }
-            : { imagesBase64: imgs.map((i) => i.base64) },
-      });
+      const formData = new FormData();
+      imgs.forEach((img, idx) => formData.append("images", img.file, `receipt-${idx + 1}.jpg`));
+      const result = await scan({ data: formData });
       const detectedStore = result.store_name ?? "";
       setStore(detectedStore);
       setStoreDetected(!!detectedStore);
@@ -242,7 +238,11 @@ function ScanPage() {
         r.readAsDataURL(compressed);
       });
       const b64 = dataUrl.split(",")[1] ?? "";
-      setImages((arr) => [...arr, { file: compressed, preview: dataUrl, base64: b64 }]);
+      console.log("[scan.mobile] prepared image", {
+        kb: Math.round(compressed.size / 1024),
+        base64KB: Math.round((b64.length * 0.75) / 1024),
+      });
+      setImages((arr) => [...arr, { file: compressed, preview: dataUrl }]);
       setPendingFile(null);
       setPendingPreview(null);
       setStep("preview");
