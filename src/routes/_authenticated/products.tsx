@@ -38,8 +38,6 @@ function ProductsPage() {
   const [store, setStore] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("name");
 
-  if (location.pathname !== "/products") return <Outlet />;
-
   const { data, isLoading } = useQuery({
     queryKey: ["products-with-purchases"],
     queryFn: async () => {
@@ -114,6 +112,8 @@ function ProductsPage() {
     }
     return rows;
   }, [data, q, cat, store, sort]);
+
+  if (location.pathname !== "/products") return <Outlet />;
 
   return (
     <div className="space-y-3">
