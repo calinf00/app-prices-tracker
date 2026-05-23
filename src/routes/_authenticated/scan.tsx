@@ -301,39 +301,6 @@ function ScanPage() {
     }
     setSaving(true);
     try {
-      // Generate a stable group_id for this receipt scan.
-      const groupId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      // Upload all images to storage and record them in receipt_images.
-      const uploadedPaths: string[] = [];
-      if (images.length > 0) {
-        const { data: userData } = await supabase.auth.getUser();
-        const uid = userData.user?.id;
-        if (uid) {
-          for (let i = 0; i < images.length; i++) {
-            const img = images[i];
-            const path = `${uid}/${Date.now()}-${i}.jpg`;
-            const { error: upErr } = await supabase.storage
-              .from("receipts")
-              .upload(path, img.file, { contentType: "image/jpeg" });
-            if (!upErr) {
-              uploadedPaths.push(path);
-              await supabase.from("receipt_images").insert({
-                receipt_group_id: groupId,
-                storage_path: path,
-                position: i,
-              });
-            } else {
-              console.warn("[scan.save] receipt upload failed", upErr);
-            }
-          }
-        }
-      }
-      const receiptUrl = uploadedPaths[0] ?? null;
-
       for (const [idx, item] of selected.entries()) {
         const cleanName = item.name_full.trim();
         console.log(`[scan.save] (${idx + 1}/${selected.length}) lookup`, cleanName);
@@ -378,9 +345,7 @@ function ScanPage() {
           unit: item.unit,
           purchase_date: effectiveDate,
           notes: "Importato da scontrino",
-          receipt_group_id: groupId,
         };
-        if (receiptUrl) purchasePayload.receipt_image_url = receiptUrl;
         console.log("[scan.save] inserting purchase", purchasePayload);
         const { error: puErr } = await supabase
           .from("purchases")
