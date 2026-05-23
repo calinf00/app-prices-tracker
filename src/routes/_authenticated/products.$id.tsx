@@ -583,3 +583,96 @@ function PurchaseDialog({
     </Dialog>
   );
 }
+
+function ProductEditDialog({
+  open,
+  onOpenChange,
+  product,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  product: ProductRow;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(product.name);
+  const [brand, setBrand] = useState(product.brand ?? "");
+  const [category, setCategory] = useState<string>(product.category ?? "Altro");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName(product.name);
+      setBrand(product.brand ?? "");
+      setCategory(product.category ?? "Altro");
+    }
+  }, [open, product]);
+
+  const save = async () => {
+    if (!name.trim()) {
+      toast.error("Inserisci il nome");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update({
+          name: name.trim(),
+          brand: brand.trim() || null,
+          category,
+        })
+        .eq("id", product.id);
+      if (error) throw error;
+      toast.success("Prodotto aggiornato ✅");
+      onSaved();
+    } catch (e: any) {
+      toast.error(toUserMessage(e, "Errore salvataggio"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Modifica prodotto</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Nome</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Brand</Label>
+            <Input value={brand} onChange={(e) => setBrand(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Categoria</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Annulla
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            💾 Salva
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
