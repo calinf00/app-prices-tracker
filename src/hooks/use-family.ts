@@ -32,6 +32,8 @@ export function useFamily() {
   const query = useQuery({
     queryKey: ["family", user?.id ?? "anon"],
     enabled: !!user,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!user) return { family: null, members: [], invites: [], myInvites: [] };
 
@@ -42,17 +44,21 @@ export function useFamily() {
       const mine = myRows?.[0] ?? null;
 
       // 2. invites addressed to me (for banner / badge)
-      const myInvitesRaw = user.email
-        ? await safeSelect<any[]>(() =>
-            supabase
-              .from("family_invites")
-              .select("*, families(name)")
-              .eq("email", user.email!)
-              .eq("status", "pending")
-              .gt("expires_at", new Date().toISOString()),
-          )
-        : [];
-      const myInvites = (myInvitesRaw ?? []) as (FamilyInvite & { families: { name: string } | null })[];
+      let myInvites: (FamilyInvite & { families: { name: string } | null })[] = [];
+      if (user.email) {
+        const normalizedEmail = user.email.trim().toLowerCase();
+        const { data: invRows, error: invErr } = await supabase
+          .from("family_invites")
+          .select("*, families(name)")
+          .eq("email", normalizedEmail)
+          .eq("status", "pending")
+          .gt("expires_at", new Date().toISOString());
+        if (invErr) {
+          console.error("[useFamily] myInvites query error:", invErr);
+        } else {
+          myInvites = (invRows ?? []) as (FamilyInvite & { families: { name: string } | null })[];
+        }
+      }
 
       if (!mine) {
         return { family: null, members: [], invites: [], myInvites };
