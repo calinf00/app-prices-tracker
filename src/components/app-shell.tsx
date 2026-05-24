@@ -99,13 +99,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main
         key={pathname}
-        className="flex-1 mx-auto w-full max-w-[640px] px-4 py-4 pb-24 animate-fade-in"
+        className="flex-1 mx-auto w-full max-w-[640px] px-4 py-4 pb-[calc(60px+env(safe-area-inset-bottom)+16px)] animate-fade-in"
       >
         {children}
       </main>
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[640px] items-stretch justify-around h-16 px-1">
+      <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto flex w-full max-w-[640px] items-stretch justify-around h-[60px] px-1">
           {tabs.map(({ to, label, icon: Icon, exact }) => {
             const active = exact
               ? pathname === to
@@ -114,10 +114,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={to}
                 to={to as "/"}
-                className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium transition-colors ${
+                className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium transition-transform duration-100 active:scale-95 ${
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
+                {active && (
+                  <span className="absolute top-1 h-1 w-6 rounded-full bg-primary" />
+                )}
                 <span className="relative">
                   <Icon className={`h-5 w-5 ${active ? "stroke-[2.2]" : ""}`} />
                 </span>
