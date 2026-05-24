@@ -120,9 +120,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <span className="relative">
                   <Icon className={`h-5 w-5 ${active ? "stroke-[2.2]" : ""}`} />
-                  {showDot && (
-                    <span className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-orange-500" />
-                  )}
                 </span>
                 <span>{label}</span>
               </Link>
