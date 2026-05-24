@@ -501,8 +501,17 @@ function ScanPage() {
                         type="number"
                         step="0.01"
                         min="0"
-                        value={it.price}
-                        onChange={(e) => updateItem(i, { price: Number(e.target.value) })}
+                        value={it.price === 0 ? "" : it.price}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "") {
+                            updateItem(i, { price: 0 });
+                            return;
+                          }
+                          const n = Number(v);
+                          if (!Number.isNaN(n)) updateItem(i, { price: n });
+                        }}
                       />
                     </div>
                     <div>
@@ -511,8 +520,20 @@ function ScanPage() {
                         type="number"
                         step="0.1"
                         min="0"
-                        value={it.quantity}
-                        onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })}
+                        value={it.quantity === 0 ? "" : it.quantity}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "") {
+                            updateItem(i, { quantity: 0 });
+                            return;
+                          }
+                          const n = Number(v);
+                          if (!Number.isNaN(n)) updateItem(i, { quantity: n });
+                        }}
+                        onBlur={(e) => {
+                          if (e.target.value === "") updateItem(i, { quantity: 1 });
+                        }}
                       />
                     </div>
                     <div>
