@@ -37,6 +37,7 @@ import {
   removeDismissedPairFn,
   dismissDedupPairFn,
 } from "@/lib/merge-products.functions";
+import { toUserMessage } from "@/lib/user-errors";
 import {
   findCatalogDuplicatesFn,
   type CatalogDuplicatePair,
