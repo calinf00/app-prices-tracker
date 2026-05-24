@@ -78,6 +78,7 @@ type ProductStat = {
   minPrice: number | null;
   maxPrice: number | null;
   count: number;
+  priceUnit?: string | null;
 };
 
 type Template = {
@@ -358,7 +359,12 @@ function ShoppingListPage() {
   const getRange = (productName: string): PriceRange | null => {
     const stat = statsByName.get(productName.toLowerCase().trim());
     if (stat && stat.minPrice !== null && stat.maxPrice !== null) {
-      return { min: stat.minPrice, max: stat.maxPrice, source: "history" };
+      return {
+        min: stat.minPrice,
+        max: stat.maxPrice,
+        source: "history",
+        priceUnit: stat.priceUnit ?? undefined,
+      };
     }
     const cached = aiCache[productName.toLowerCase().trim()];
     if (cached) return cached;
@@ -414,13 +420,8 @@ function ShoppingListPage() {
         const r = getRange(i.product_name);
         if (!r) return;
         const rawQty = i.quantity ?? 1;
-        // If price refers to kg/l but quantity is in g/ml, normalize.
-        const priceUnit = r.priceUnit ?? baseUnitOf(i.unit);
-        const needsConversion =
-          isSubUnit(i.unit) && (priceUnit === "kg" || priceUnit === "l");
-        const q = needsConversion ? convertToBaseUnit(rawQty, i.unit) : rawQty;
-        min += r.min * q;
-        max += r.max * q;
+        min += estimateCost(r.min, rawQty, i.unit ?? "pz");
+        max += estimateCost(r.max, rawQty, i.unit ?? "pz");
       });
     return { totalMin: min, totalMax: max };
   }, [items, statsByName, aiCache]);
