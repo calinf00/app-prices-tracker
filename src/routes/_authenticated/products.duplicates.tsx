@@ -205,7 +205,7 @@ function DuplicatesPage() {
       qc.invalidateQueries({ queryKey: ["product-merges"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e));
     } finally {
       setPending(null);
     }
@@ -218,7 +218,7 @@ function DuplicatesPage() {
       toast.success("Rimosso dal blocklist");
       qc.invalidateQueries({ queryKey: ["product-dismissed-pairs"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e));
     } finally {
       setPending(null);
     }
@@ -285,7 +285,7 @@ function DuplicatesPage() {
         toast.success(`Trovate ${filtered.length} possibili coppie duplicate`);
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore durante l'analisi AI");
+      toast.error(toUserMessage(e, "Errore durante l'analisi AI"));
     } finally {
       setAiLoading(false);
     }
@@ -322,7 +322,7 @@ function DuplicatesPage() {
         localStorage.setItem(KEY, JSON.stringify(list));
         toast.success("Coppia ignorata (salvata localmente)");
       } catch {
-        toast.error(e?.message ?? "Errore");
+        toast.error(toUserMessage(e));
       }
     } finally {
       setAiPairs((arr) =>
