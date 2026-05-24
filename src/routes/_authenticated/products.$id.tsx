@@ -374,7 +374,25 @@ function ProductDetailPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className="font-semibold">€{x.price.toFixed(2)}</div>
+                  <div className="flex flex-col items-end">
+                    <div className="font-semibold">€{x.price.toFixed(2)}</div>
+                    {(() => {
+                      const ppbu =
+                        x.price_per_base_unit ??
+                        (x.quantity && x.quantity > 0
+                          ? calcUnitPrices(x.price, x.quantity, x.unit ?? "pz").pricePerBaseUnit
+                          : null);
+                      const bu =
+                        x.base_unit ??
+                        (x.unit ? calcUnitPrices(x.price, x.quantity ?? 1, x.unit).baseUnitLabel.replace("€/", "") : null);
+                      if (!ppbu || !bu) return null;
+                      return (
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          €{ppbu.toFixed(2)}/{bu}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <Button size="icon" variant="ghost" onClick={() => setEditing(x)} aria-label="Modifica">
                     <Pencil className="h-4 w-4 text-muted-foreground" />
                   </Button>
