@@ -15,7 +15,7 @@ function randomCode() {
   return s;
 }
 
-async function safeSelect<T>(fn: () => Promise<{ data: T | null; error: unknown }>): Promise<T | null> {
+async function safeSelect<T>(fn: () => PromiseLike<{ data: T | null; error: unknown }>): Promise<T | null> {
   try {
     const { data, error } = await fn();
     if (error) return null;
