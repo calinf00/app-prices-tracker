@@ -44,12 +44,21 @@ function ProductsPage() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, name, brand, category, image_url, purchases(price, purchase_date, store_name)",
+          "id, name, brand, category, image_url, merged_into, purchases(price, purchase_date, store_name)",
         )
-        .is("merged_into", null)
         .limit(500);
-      if (error) throw error;
-      return (data ?? []) as unknown as Row[];
+      if (error) {
+        // Fallback if the merged_into column doesn't exist yet (migration not applied)
+        const { data: d2, error: e2 } = await supabase
+          .from("products")
+          .select(
+            "id, name, brand, category, image_url, purchases(price, purchase_date, store_name)",
+          )
+          .limit(500);
+        if (e2) throw e2;
+        return (d2 ?? []) as unknown as Row[];
+      }
+      return ((data ?? []) as any[]).filter((p) => !p.merged_into) as Row[];
     },
   });
 
