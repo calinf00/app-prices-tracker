@@ -904,6 +904,12 @@ function ScanPage() {
           )}
         </div>
       )}
+      <ProductDedupModal
+        open={dedupOpen}
+        pairs={dedupPairs}
+        onResolved={handleDedupResolved}
+        onClose={handleDedupResolved}
+      />
     </div>
   );
 }
