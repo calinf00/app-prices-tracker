@@ -769,24 +769,39 @@ function ShoppingListPage() {
       {/* List */}
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Caricamento...</p>
-      ) : (items?.length ?? 0) === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted-foreground">
-          La lista è vuota. Aggiungi il primo prodotto!
+          {hasFamily && scope === "mine"
+            ? "Non hai articoli tuoi. Passa a 'Tutta la famiglia' per vedere il resto."
+            : "La lista è vuota. Aggiungi il primo prodotto!"}
         </Card>
       ) : (
         <div className="space-y-2">
-          {items!.map((item) => (
-            <ShoppingItemCard
-              key={item.id}
-              item={item}
-              range={getRange(item.product_name)}
-              onToggle={(v) => toggle.mutate({ id: item.id, value: v })}
-              onDelete={() => remove.mutate(item.id)}
-              onUpdate={(quantity, unit) =>
-                updateItem.mutate({ id: item.id, quantity, unit })
-              }
-            />
-          ))}
+          {visibleItems.map((item) => {
+            const addedBy =
+              hasFamily && item.user_id && item.user_id !== user?.id
+                ? family.getMember(item.user_id)
+                : null;
+            const assignee =
+              hasFamily && item.assigned_to ? family.getMember(item.assigned_to) : null;
+            const isMine = !item.user_id || (user && item.user_id === user.id);
+            return (
+              <ShoppingItemCard
+                key={item.id}
+                item={item}
+                range={getRange(item.product_name)}
+                addedBy={addedBy}
+                assignee={assignee}
+                canAssignToMe={!!addedBy && (!assignee || assignee.user_id !== user?.id)}
+                onAssignToMe={() => assignToMe.mutate(item.id)}
+                onToggle={(v) => toggle.mutate({ id: item.id, value: v })}
+                onDelete={isMine ? () => remove.mutate(item.id) : undefined}
+                onUpdate={(quantity, unit) =>
+                  updateItem.mutate({ id: item.id, quantity, unit })
+                }
+              />
+            );
+          })}
         </div>
       )}
 
