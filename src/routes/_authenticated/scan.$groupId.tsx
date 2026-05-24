@@ -93,10 +93,13 @@ function ReceiptDetailPage() {
     },
   });
 
+  // NOTE: purchases.price is the TOTAL price paid for the recorded
+  // (quantity, unit) — NOT a per-unit price. So the receipt total is the
+  // simple sum of `price`, with no multiplication by quantity.
   const total = useMemo(
     () =>
       (data?.purchases ?? []).reduce(
-        (s, p) => s + Number(p.price) * (p.quantity ?? 1),
+        (s, p) => s + Number(p.price),
         0,
       ),
     [data],
