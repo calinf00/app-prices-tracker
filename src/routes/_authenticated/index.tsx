@@ -181,7 +181,7 @@ function HomePage() {
   }, [q, data]);
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-8 md:space-y-10 relative">
       {/* Greeting */}
       <section className="space-y-1">
         <h2 className="text-2xl font-bold tracking-tight">
@@ -192,7 +192,7 @@ function HomePage() {
 
       {/* AI Assistant quick access */}
       <Link to="/assistant">
-        <Card className="p-3 flex items-center gap-3 border-primary/20 hover:border-primary/40 transition-colors bg-primary/5">
+        <Card className="p-4 flex items-center gap-3 border-primary/20 hover:border-primary/40 transition-colors bg-primary/5">
           <div className="h-10 w-10 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0">
             <Bot className="h-5 w-5" />
           </div>
@@ -206,7 +206,7 @@ function HomePage() {
 
       {/* Search */}
       <section className="space-y-2">
-        <div className="relative">
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Cerca un prodotto..."
@@ -242,7 +242,7 @@ function HomePage() {
       </section>
 
       {/* Stats - horizontal scroll */}
-      <section>
+      <section className="mb-2">
         <div className="-mx-4 px-4 overflow-x-auto">
           <div className="flex gap-3 min-w-max pb-1">
             <StatCard icon={Package} label="Prodotti tracciati" value={String(data?.productsCount ?? 0)} />
@@ -255,7 +255,7 @@ function HomePage() {
 
       {/* Recent purchases */}
       <section>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1">Ultimi acquisti</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Ultimi acquisti</h3>
         {!data ? (
           <p className="text-sm text-muted-foreground px-1">Caricamento...</p>
         ) : data.recent.length === 0 ? (
@@ -263,7 +263,7 @@ function HomePage() {
             Nessun acquisto registrato.
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {data.recent.map((p) => {
               const Icon = iconForCategory(p.products?.category);
               const inner = (
@@ -302,7 +302,7 @@ function HomePage() {
 
       {/* Price alerts */}
       <section>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1 flex items-center gap-2">
           <Tag className="h-4 w-4" /> Avvisi prezzi
         </h3>
         {!data || data.alerts.length === 0 ? (
@@ -310,7 +310,7 @@ function HomePage() {
             Nessuna variazione di prezzo rilevata.
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {data.alerts.map((a) => {
               const up = a.deltaPct > 0;
               return (
@@ -389,7 +389,7 @@ function StatCard({
   value: string;
 }) {
   return (
-    <Card className="p-4 min-w-[160px] max-w-[200px]">
+    <Card className="p-4 min-h-[64px] min-w-[160px] max-w-[200px]">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="h-4 w-4" /> {label}
       </div>
