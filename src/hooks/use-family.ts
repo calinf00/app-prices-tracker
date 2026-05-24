@@ -252,6 +252,15 @@ export function useFamily() {
 
       // Riusa un eventuale invito precedente invece di cancellarlo: lo schema mantiene lo storico
       // e il vincolo unico su family_id/email altrimenti blocca i nuovi inviti.
+      const { data: pendingInviteRows, error: pendingInviteErr } = await supabase
+        .from("family_invites")
+        .select("id")
+        .eq("family_id", data.family.id)
+        .eq("email", normalized)
+        .eq("status", "pending")
+        .limit(1);
+      if (pendingInviteErr) throw pendingInviteErr;
+
       const { data: existingInviteRows, error: existingInviteErr } = await supabase
         .from("family_invites")
         .select("id")
@@ -261,7 +270,7 @@ export function useFamily() {
         .limit(1);
       if (existingInviteErr) throw existingInviteErr;
 
-      const existingInviteId = existingInviteRows?.[0]?.id;
+      const existingInviteId = pendingInviteRows?.[0]?.id ?? existingInviteRows?.[0]?.id;
       if (existingInviteId) {
         const { error: refreshErr } = await supabase
           .from("family_invites")
