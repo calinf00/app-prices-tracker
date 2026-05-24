@@ -39,6 +39,7 @@ import { ProductDedupModal, type DedupPair } from "@/components/product-dedup-mo
 import { findSimilarProductsFn } from "@/lib/product-similarity.functions";
 import { useFamily } from "@/hooks/use-family";
 import { Switch } from "@/components/ui/switch";
+import { calcUnitPrices } from "@/lib/unit-conversion";
 const ReceiptCrop = lazy(() =>
   import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
 );
@@ -353,18 +354,29 @@ function ScanPage() {
         if (wasCreated && productId) {
           newlyCreated.push({ id: productId, name: cleanName });
         }
+        const qty = Number(item.quantity) || 1;
+        const calc = calcUnitPrices(Number(item.price) || 0, qty, item.unit);
         const purchasePayload: any = {
           product_id: productId,
           store_name: store.trim() || null,
-          price: item.price,
-          quantity: item.quantity || 1,
+          price: Number(item.price) || 0,
+          quantity: qty,
           unit: item.unit,
           purchase_date: effectiveDate,
           notes: "Importato da scontrino",
           user_id: uid,
         };
-        console.log("[scan.save] inserting purchase", purchasePayload);
-        const { error: puErr } = await supabase.from("purchases").insert(purchasePayload);
+        const purchaseWithUnitPrice = {
+          ...purchasePayload,
+          price_per_base_unit: Number(calc.pricePerBaseUnit.toFixed(4)),
+          base_unit: calc.baseUnitLabel.replace("€/", ""),
+        };
+        console.log("[scan.save] inserting purchase", purchaseWithUnitPrice);
+        let { error: puErr } = await supabase.from("purchases").insert(purchaseWithUnitPrice);
+        if (puErr && /column|schema cache/i.test(puErr.message ?? "")) {
+          const retry = await supabase.from("purchases").insert(purchasePayload);
+          puErr = retry.error;
+        }
         if (puErr) {
           console.error("[scan.save] purchase insert error", puErr);
           throw new Error(
