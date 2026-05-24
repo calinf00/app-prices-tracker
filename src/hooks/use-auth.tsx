@@ -24,6 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       queryClient.invalidateQueries();
+      if (import.meta.env.DEV && newSession?.user) {
+        console.info('[Auth] User logged in:', newSession.user.id, newSession.user.email);
+      }
     });
 
     supabase.auth.getSession().then(({ data }) => {
