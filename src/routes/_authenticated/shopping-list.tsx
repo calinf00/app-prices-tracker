@@ -48,6 +48,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { UNITS } from "@/lib/categories";
 import { estimatePrice, smartShoppingList } from "@/lib/openai.functions";
+import { convertToBaseUnit, baseUnitOf, isSubUnit } from "@/lib/unit-conversion";
 
 export const Route = createFileRoute("/_authenticated/shopping-list")({
   component: ShoppingListPage,
@@ -352,7 +353,12 @@ function ShoppingListPage() {
           setAiCache((prev) => {
             const next = {
               ...prev,
-              [key]: { min: res.min, max: res.max, source: "ai" as const },
+              [key]: {
+                min: res.min,
+                max: res.max,
+                source: "ai" as const,
+                priceUnit: baseUnitOf(res.unit),
+              },
             };
             saveJSON(AI_PRICE_CACHE_KEY, next);
             return next;
@@ -379,7 +385,12 @@ function ShoppingListPage() {
       .forEach((i) => {
         const r = getRange(i.product_name);
         if (!r) return;
-        const q = i.quantity ?? 1;
+        const rawQty = i.quantity ?? 1;
+        // If price refers to kg/l but quantity is in g/ml, normalize.
+        const priceUnit = r.priceUnit ?? baseUnitOf(i.unit);
+        const needsConversion =
+          isSubUnit(i.unit) && (priceUnit === "kg" || priceUnit === "l");
+        const q = needsConversion ? convertToBaseUnit(rawQty, i.unit) : rawQty;
         min += r.min * q;
         max += r.max * q;
       });
