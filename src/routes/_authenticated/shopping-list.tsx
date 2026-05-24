@@ -963,15 +963,38 @@ function ShoppingItemCard({
                 {item.quantity ?? 1} {item.unit ?? ""}
               </span>
               {range ? (
-                <span className="text-muted-foreground/80">
-                  €{range.min.toFixed(2)} - €{range.max.toFixed(2)}
-                  {range.source === "ai" && (
-                    <span className="ml-1 inline-flex items-center gap-0.5 text-[10px]">
-                      <Bot className="h-3 w-3" />
-                      stima AI
+                (() => {
+                  const rawQty = item.quantity ?? 1;
+                  const priceUnit = range.priceUnit ?? baseUnitOf(item.unit);
+                  const converted =
+                    isSubUnit(item.unit) && (priceUnit === "kg" || priceUnit === "l");
+                  const q = converted ? convertToBaseUnit(rawQty, item.unit) : rawQty;
+                  const subMin = range.min * q;
+                  const subMax = range.max * q;
+                  return (
+                    <span
+                      className="text-muted-foreground/80"
+                      title={
+                        converted
+                          ? `Prezzo €${range.min.toFixed(2)}-${range.max.toFixed(2)}/${priceUnit} calcolato su ${rawQty} ${item.unit}`
+                          : undefined
+                      }
+                    >
+                      €{subMin.toFixed(2)} - €{subMax.toFixed(2)}
+                      {converted && (
+                        <span className="ml-1 text-[10px] text-muted-foreground/70">
+                          (€{range.min.toFixed(2)}/{priceUnit})
+                        </span>
+                      )}
+                      {range.source === "ai" && (
+                        <span className="ml-1 inline-flex items-center gap-0.5 text-[10px]">
+                          <Bot className="h-3 w-3" />
+                          stima AI
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
+                  );
+                })()
               ) : (
                 <span className="text-muted-foreground/60 italic">
                   prezzo in stima...
