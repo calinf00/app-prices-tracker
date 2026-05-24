@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, GitMerge } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ function ProductsPage() {
         .select(
           "id, name, brand, category, image_url, purchases(price, purchase_date, store_name)",
         )
+        .is("merged_into", null)
         .limit(500);
       if (error) throw error;
       return (data ?? []) as unknown as Row[];
@@ -129,6 +130,15 @@ function ProductsPage() {
         </div>
         <Button size="icon" onClick={() => navigate({ to: "/products/new" })} aria-label="Aggiungi prodotto">
           <Plus className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => navigate({ to: "/products/duplicates" })}
+          aria-label="Gestisci duplicati"
+          title="Gestisci duplicati"
+        >
+          <GitMerge className="h-4 w-4" />
         </Button>
       </div>
 
