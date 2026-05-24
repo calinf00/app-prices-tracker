@@ -157,6 +157,7 @@ function NoFamily({
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   return (
     <div className="space-y-4 max-w-md mx-auto pt-6">
@@ -180,11 +181,14 @@ function NoFamily({
           disabled={busy !== null}
           onClick={async () => {
             setBusy("create");
+            setCreateError(null);
             try {
               await onCreate(name);
               toast.success("Famiglia creata");
             } catch (e) {
-              toast.error(toUserMessage(e as Error));
+              const msg = (e as Error).message || toUserMessage(e as Error);
+              setCreateError(msg);
+              toast.error(msg);
             } finally {
               setBusy(null);
             }
@@ -192,6 +196,11 @@ function NoFamily({
         >
           {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crea"}
         </Button>
+        {createError && (
+          <div className="text-xs rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-2 whitespace-pre-wrap">
+            {createError}
+          </div>
+        )}
       </Card>
 
       <div className="text-center text-xs uppercase tracking-wider text-muted-foreground">oppure</div>

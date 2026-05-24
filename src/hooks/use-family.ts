@@ -103,16 +103,37 @@ export function useFamily() {
       if (!user) throw new Error("Non autenticato");
       const { data: fam, error } = await supabase
         .from("families")
-        .insert({ name: name.trim() || "La mia famiglia", created_by: user.id })
+        .insert({
+          name: name.trim() || "La mia famiglia",
+          created_by: user.id,
+          invite_code: randomCode(),
+        })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        const code = (error as { code?: string }).code;
+        if (code === "42P01") {
+          throw new Error(
+            "Tabelle famiglia non trovate. Applica prima la migration Supabase dal file supabase/migrations/20260524200000_family_groups.sql",
+          );
+        }
+        if (code === "42501") {
+          throw new Error("Permessi insufficienti. Controlla le policy RLS su Supabase.");
+        }
+        throw new Error(error.message);
+      }
       const { error: memErr } = await supabase.from("family_members").insert({
         family_id: (fam as Family).id,
         user_id: user.id,
         role: "owner",
+        display_name:
+          (user.user_metadata as { full_name?: string } | null)?.full_name ||
+          user.email?.split("@")[0] ||
+          "Proprietario",
+        email: user.email || "",
       });
-      if (memErr) throw memErr;
+      if (memErr)
+        throw new Error("Famiglia creata ma errore nell'aggiunta come membro: " + memErr.message);
     },
     onSuccess: invalidate,
   });
@@ -131,8 +152,18 @@ export function useFamily() {
         family_id: (fam as { id: string }).id,
         user_id: user.id,
         role: "member",
+        display_name:
+          (user.user_metadata as { full_name?: string } | null)?.full_name ||
+          user.email?.split("@")[0] ||
+          "Membro",
+        email: user.email || "",
       });
-      if (insErr) throw insErr;
+      if (insErr) {
+        if ((insErr as { code?: string }).code === "23505") {
+          throw new Error("Sei già membro di questa famiglia.");
+        }
+        throw insErr;
+      }
     },
     onSuccess: invalidate,
   });
@@ -219,6 +250,11 @@ export function useFamily() {
         family_id: invite.family_id,
         user_id: user.id,
         role: "member",
+        display_name:
+          (user.user_metadata as { full_name?: string } | null)?.full_name ||
+          user.email?.split("@")[0] ||
+          "Membro",
+        email: user.email || "",
       });
       if (insErr && !String(insErr.message).includes("duplicate")) throw insErr;
       const { error } = await supabase
