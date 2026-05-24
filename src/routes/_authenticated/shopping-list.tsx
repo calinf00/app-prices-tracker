@@ -1019,8 +1019,8 @@ function ShoppingItemCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-lg">
-      <div className="absolute inset-0 flex items-center justify-end pr-4 bg-destructive text-destructive-foreground rounded-lg">
+    <div className="relative overflow-hidden rounded-xl">
+      <div className="absolute inset-1 flex items-center justify-end pr-4 bg-destructive text-destructive-foreground rounded-lg">
         <Trash2 className="h-4 w-4" />
       </div>
       <Card
