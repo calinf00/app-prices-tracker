@@ -1019,12 +1019,12 @@ function ShoppingItemCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-lg">
-      <div className="absolute inset-0 flex items-center justify-end pr-4 bg-destructive text-destructive-foreground rounded-lg">
+    <div className="relative overflow-hidden rounded-xl">
+      <div className="absolute inset-1 flex items-center justify-end pr-4 bg-destructive text-destructive-foreground rounded-lg">
         <Trash2 className="h-4 w-4" />
       </div>
       <Card
-        className={`relative p-3 flex items-center gap-3 transition-transform min-h-[64px] ${
+        className={`relative p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl ${
           item.is_purchased ? "opacity-60" : ""
         }`}
         style={{ transform: `translateX(${offset}px)` }}
