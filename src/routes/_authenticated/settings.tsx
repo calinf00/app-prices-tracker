@@ -167,9 +167,9 @@ function SettingsPage() {
   };
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Account / nome */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <UserIcon className="h-4 w-4 text-muted-foreground" /> Account
         </div>
@@ -199,7 +199,7 @@ function SettingsPage() {
       </Card>
 
       {/* Tema */}
-      <Card className="p-4 flex items-center justify-between gap-3 min-h-[60px]">
+      <Card className="p-5 flex items-center justify-between gap-3 min-h-[60px]">
         <div className="flex items-center gap-3">
           {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           <div>
@@ -218,7 +218,7 @@ function SettingsPage() {
       </Card>
 
       {/* Categorie personalizzate */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Tag className="h-4 w-4 text-muted-foreground" /> Categorie personalizzate
         </div>
@@ -261,7 +261,7 @@ function SettingsPage() {
       </Card>
 
       {/* Negozi preferiti */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Store className="h-4 w-4 text-muted-foreground" /> Negozi preferiti
         </div>
@@ -303,7 +303,7 @@ function SettingsPage() {
       </Card>
 
       {/* Esporta dati */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Download className="h-4 w-4 text-muted-foreground" /> Esporta dati
         </div>

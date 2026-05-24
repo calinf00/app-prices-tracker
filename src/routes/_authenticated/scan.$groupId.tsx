@@ -159,7 +159,7 @@ function ReceiptDetailPage() {
     );
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-6 pb-8">
       <Link
         to="/scan"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -167,7 +167,7 @@ function ReceiptDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Scansioni
       </Link>
 
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">

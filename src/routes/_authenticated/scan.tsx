@@ -742,7 +742,7 @@ function ScanPage() {
 
   // Capture / preview / analyzing
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-6 pb-8">
       {step === "crop" && pendingPreview && (
         <Suspense fallback={null}>
           <ReceiptCrop src={pendingPreview} onCancel={resetAll} onConfirm={handleCropConfirm} />
@@ -902,7 +902,7 @@ function ScanPage() {
           {recent.isLoading ? (
             <p className="text-xs text-muted-foreground px-1">Caricamento...</p>
           ) : (recent.data ?? []).length === 0 ? (
-            <Card className="p-4 text-center text-sm text-muted-foreground">
+            <Card className="p-5 text-center text-sm text-muted-foreground">
               Nessuna scansione effettuata.
             </Card>
           ) : (

@@ -219,12 +219,12 @@ function ProductDetailPage() {
   const Icon = meta.icon;
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-6 pb-8">
       <Link to="/products" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Tutti i prodotti
       </Link>
 
-      <Card className="p-4 flex gap-4 items-center">
+      <Card className="p-5 flex gap-4 items-center">
         <div className={`h-16 w-16 rounded-lg overflow-hidden grid place-items-center shrink-0 ${meta.className}`}>
           {p.image_url ? (
             <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />

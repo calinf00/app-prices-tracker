@@ -62,7 +62,7 @@ function FamilyPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {f.myInvites.length > 0 && (
         <ReceivedInvites
           invites={f.myInvites}
@@ -187,7 +187,7 @@ function NoFamily({
   const [createError, setCreateError] = useState<string | null>(null);
 
   return (
-    <div className="space-y-4 max-w-md mx-auto pt-6">
+    <div className="space-y-6 max-w-md mx-auto pt-8">
       <div className="text-center space-y-2">
         <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 text-primary grid place-items-center">
           <Users className="h-6 w-6" />
@@ -198,7 +198,7 @@ function NoFamily({
         </p>
       </div>
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="space-y-1">
           <Label>Crea una nuova famiglia</Label>
           <Input placeholder="Es. Famiglia Rossi" value={name} onChange={(e) => setName(e.target.value)} />
@@ -232,7 +232,7 @@ function NoFamily({
 
       <div className="text-center text-xs uppercase tracking-wider text-muted-foreground">oppure</div>
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="space-y-1">
           <Label>Unisciti con codice invito</Label>
           <Input
@@ -279,7 +279,7 @@ function FamilyHeader({
   const [value, setValue] = useState(name);
 
   return (
-    <Card className="p-4 flex items-center gap-3">
+    <Card className="p-5 flex items-center gap-3">
       <div className="h-10 w-10 rounded-full bg-primary/10 text-primary grid place-items-center">
         <Users className="h-5 w-5" />
       </div>
@@ -311,7 +311,7 @@ function FamilyHeader({
 
 function InviteCodeCard({ code, onRegenerate }: { code: string; onRegenerate: () => void }) {
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-5 space-y-3">
       <div className="text-sm font-medium">Codice invito</div>
       <div className="flex items-center gap-2">
         <div className="flex-1 font-mono tracking-widest text-lg bg-muted rounded-md px-3 py-2 text-center">{code}</div>
@@ -349,14 +349,14 @@ function MembersCard({
   onRemove: (userId: string) => void;
 }) {
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-5 space-y-3">
       <div className="text-sm font-medium">Membri ({members.length})</div>
       <ul className="divide-y divide-border">
         {members.map((m) => {
           const isMe = m.user_id === currentUserId;
           const isMemberOwner = m.user_id === ownerId;
           return (
-            <li key={m.user_id} className="flex items-center gap-3 py-3">
+            <li key={m.user_id} className="flex items-center gap-3 py-4">
               <div className="h-9 w-9 rounded-full bg-secondary grid place-items-center text-xs font-semibold">
                 {initials(m.display_name || m.email || "?")}
               </div>
@@ -410,7 +410,7 @@ function InvitesCard({
 }) {
   const [email, setEmail] = useState("");
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-5 space-y-3">
       <div className="text-sm font-medium">Inviti</div>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
@@ -437,7 +437,7 @@ function InvitesCard({
       {invites.length > 0 && (
         <ul className="divide-y divide-border">
           {invites.map((inv) => (
-            <li key={inv.id} className="flex items-center gap-2 py-2">
+            <li key={inv.id} className="flex items-center gap-2 py-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm truncate">{inv.email}</div>
                 <div className="text-[11px] text-muted-foreground">
@@ -459,7 +459,7 @@ function DangerZone({ familyName, onDelete }: { familyName: string; onDelete: ()
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
   return (
-    <Card className="p-4 space-y-3 border-destructive/40">
+    <Card className="p-5 space-y-3 border-destructive/40">
       <div className="text-sm font-medium text-destructive">Zona pericolosa</div>
       <p className="text-xs text-muted-foreground">
         Eliminando la famiglia, tutti i membri perderanno l'accesso condiviso. L'azione è irreversibile.

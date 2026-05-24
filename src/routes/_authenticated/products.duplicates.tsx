@@ -333,7 +333,7 @@ function DuplicatesPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Link to="/products">
           <Button variant="ghost" size="icon" aria-label="Indietro">
@@ -346,7 +346,7 @@ function DuplicatesPage() {
       </div>
 
       {/* A) Manual merge */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <h3 className="text-sm font-semibold">Unisci prodotti manualmente</h3>
         <div className="space-y-2">
           <div>
@@ -411,7 +411,7 @@ function DuplicatesPage() {
       </Card>
 
       {/* B) AI suggestions */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">
             Suggerimenti AI — Possibili duplicati
