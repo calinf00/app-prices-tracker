@@ -43,6 +43,9 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, CATEGORIES, STORE_COLORS, UNITS } from "@/lib/categories";
+import { Switch } from "@/components/ui/switch";
+import { calcUnitPrices } from "@/lib/unit-conversion";
+import { UnitPriceFields } from "./products.new";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   component: ProductDetailPage,
@@ -56,6 +59,8 @@ type Purchase = {
   unit: string | null;
   purchase_date: string;
   notes: string | null;
+  price_per_base_unit?: number | null;
+  base_unit?: string | null;
 };
 
 type ProductRow = {
@@ -83,7 +88,7 @@ function ProductDetailPage() {
           supabase.from("products").select("id, name, brand, category, image_url").eq("id", id).single(),
           supabase
             .from("purchases")
-            .select("id, store_name, price, quantity, unit, purchase_date, notes")
+            .select("id, store_name, price, quantity, unit, purchase_date, notes, price_per_base_unit, base_unit")
             .eq("product_id", id)
             .order("purchase_date", { ascending: true }),
         ]);
