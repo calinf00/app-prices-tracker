@@ -681,6 +681,17 @@ function ScanPage() {
 
         {/* Footer */}
         <div className="fixed bottom-16 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50 shadow-lg">
+          {hasFamily && familySize > 1 && (
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div className="min-w-0">
+                <Label className="text-xs">Condividi con la famiglia</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Visibile a {familySize} membri
+                </p>
+              </div>
+              <Switch checked={shareWithFamily} onCheckedChange={setShareWithFamily} />
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {selectedCount} di {items.length} selezionati
