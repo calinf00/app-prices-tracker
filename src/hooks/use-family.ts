@@ -232,6 +232,7 @@ export function useFamily() {
     mutationFn: async (email: string) => {
       if (!user || !data.family) throw new Error("Nessuna famiglia");
       const normalized = email.trim().toLowerCase();
+      if (!normalized) throw new Error("Inserisci un'email valida.");
       // Blocca se l'email è già membro della famiglia
       const { data: existingMember, error: memCheckErr } = await supabase
         .from("family_members")
@@ -245,18 +246,55 @@ export function useFamily() {
       if (existingMember) {
         throw new Error("Questa email è già membro della famiglia.");
       }
-      // Rimuovi eventuali inviti precedenti (revocati/scaduti) per evitare unique conflict
-      await supabase
+
+      const nowIso = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Riusa un eventuale invito precedente invece di cancellarlo: lo schema mantiene lo storico
+      // e il vincolo unico su family_id/email altrimenti blocca i nuovi inviti.
+      const { data: pendingInviteRows, error: pendingInviteErr } = await supabase
         .from("family_invites")
-        .delete()
+        .select("id")
         .eq("family_id", data.family.id)
-        .eq("email", normalized);
+        .eq("email", normalized)
+        .eq("status", "pending")
+        .limit(1);
+      if (pendingInviteErr) throw pendingInviteErr;
+
+      const { data: existingInviteRows, error: existingInviteErr } = await supabase
+        .from("family_invites")
+        .select("id")
+        .eq("family_id", data.family.id)
+        .eq("email", normalized)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (existingInviteErr) throw existingInviteErr;
+
+      const existingInviteId = pendingInviteRows?.[0]?.id ?? existingInviteRows?.[0]?.id;
+      if (existingInviteId) {
+        const { error: refreshErr } = await supabase
+          .from("family_invites")
+          .update({
+            invited_by: user.id,
+            status: "pending",
+            created_at: nowIso,
+            expires_at: expiresAt,
+          })
+          .eq("id", existingInviteId);
+        if (refreshErr) throw refreshErr;
+        return;
+      }
+
       const { error } = await supabase.from("family_invites").insert({
         family_id: data.family.id,
         invited_by: user.id,
         email: normalized,
         status: "pending",
+        expires_at: expiresAt,
       });
+      if ((error as { code?: string } | null)?.code === "23505") {
+        throw new Error("Esiste già un invito per questa email. Riprova tra poco.");
+      }
       if (error) throw error;
     },
     onSuccess: invalidate,
