@@ -1032,9 +1032,7 @@ function ShoppingItemCard({
         <Trash2 className="h-4 w-4" />
       </div>
       <Card
-        className={`relative z-10 p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl ${
-          item.is_purchased ? "opacity-60" : ""
-        }`}
+        className="relative z-10 p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl bg-card"
         style={{ transform: `translateX(${offset}px)` }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
