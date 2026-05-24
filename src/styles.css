@@ -142,3 +142,15 @@
     color: var(--color-foreground);
   }
 }
+
+/* Mobile button overflow guard: prevent action button text from spilling
+   outside button boundaries on narrow viewports. */
+@media (max-width: 390px) {
+  button {
+    white-space: normal;
+    word-break: break-word;
+    height: auto;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
