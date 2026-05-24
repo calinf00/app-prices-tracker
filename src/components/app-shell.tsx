@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Camera, Package, ShoppingCart, Users, Settings, X, Bot } from "lucide-react";
 import type { ReactNode } from "react";
 import { useFamily } from "@/hooks/use-family";
+import { useInviteCount } from "@/hooks/use-invite-count";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { toUserMessage } from "@/lib/user-errors";
@@ -32,6 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     titles[pathname] ??
     (pathname.startsWith("/products/") ? "Dettaglio prodotto" : "App Prezzi");
 
+  const inviteCount = useInviteCount();
   const family = useFamily();
   const pendingInvite = family.myInvites?.[0] as
     | (typeof family.myInvites)[number]
@@ -49,8 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-label="Famiglia"
             >
               <Users className="h-5 w-5" />
-              {pendingInvite && (
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-orange-500" />
+              {inviteCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-background">
+                  {inviteCount > 9 ? "9+" : inviteCount}
+                </span>
               )}
             </Link>
             <Link
