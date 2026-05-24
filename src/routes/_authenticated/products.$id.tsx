@@ -565,8 +565,8 @@ function PurchaseDialog({
       };
       const exec = async (body: any) =>
         isEdit && purchase
-          ? supabase.from("purchases").update(body).eq("id", purchase.id)
-          : supabase.from("purchases").insert(body);
+          ? supabase.from("purchases").update(body).eq("id", purchase.id).select("id")
+          : supabase.from("purchases").insert(body).select("id");
       let { error } = await exec(withUnitPrice);
       if (error && /column|schema cache/i.test(error.message ?? "")) {
         const retry = await exec(payload);
@@ -578,6 +578,13 @@ function PurchaseDialog({
         }
       }
       if (error) throw error;
+      // Verifica che la riga sia stata effettivamente toccata (RLS silenzioso)
+      const { data: check } = isEdit && purchase
+        ? await supabase.from("purchases").select("id").eq("id", purchase.id).maybeSingle()
+        : { data: { id: "ok" } as any };
+      if (isEdit && !check) {
+        throw new Error("Non hai i permessi per modificare questo acquisto.");
+      }
       toast.success(isEdit ? "Acquisto aggiornato" : "Acquisto aggiunto");
       onSaved();
     } catch (e: any) {
@@ -688,8 +695,22 @@ function ProductEditDialog({
           brand: brand.trim() || null,
           category,
         })
-        .eq("id", product.id);
+        .eq("id", product.id)
+        .select("id");
       if (error) throw error;
+      const { data: check } = await supabase
+        .from("products")
+        .select("name, brand, category")
+        .eq("id", product.id)
+        .maybeSingle();
+      if (
+        !check ||
+        check.name !== name.trim() ||
+        (check.brand ?? null) !== (brand.trim() || null) ||
+        check.category !== category
+      ) {
+        throw new Error("Non hai i permessi per modificare questo prodotto.");
+      }
       toast.success("Prodotto aggiornato");
       onSaved();
     } catch (e: any) {
