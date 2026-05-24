@@ -337,8 +337,9 @@ function ShoppingListPage() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("shopping_list").delete().eq("id", id);
+      const { data, error } = await supabase.from("shopping_list").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Non hai i permessi per eliminare questo prodotto condiviso");
     },
     onSuccess: (_, id) => {
       qc.setQueryData<Item[]>(["shopping_list"], (old) => old?.filter((item) => item.id !== id) ?? []);
