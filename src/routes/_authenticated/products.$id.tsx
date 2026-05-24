@@ -43,7 +43,6 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, CATEGORIES, STORE_COLORS, UNITS } from "@/lib/categories";
-import { Switch } from "@/components/ui/switch";
 import { calcUnitPrices } from "@/lib/unit-conversion";
 import { UnitPriceFields } from "./products.new";
 
