@@ -30,8 +30,10 @@ import {
   Mail,
   LogOut,
   Loader2,
+  Bell,
 } from "lucide-react";
 import { toUserMessage } from "@/lib/user-errors";
+import type { FamilyInvite } from "@/lib/supabase-types";
 
 export const Route = createFileRoute("/_authenticated/family")({
   component: FamilyPage,
@@ -59,89 +61,101 @@ function FamilyPage() {
     );
   }
 
-  if (!f.family) return <NoFamily onCreate={f.createFamily} onJoin={f.joinByCode} />;
-
   return (
     <div className="space-y-4">
-      <FamilyHeader
-        name={f.family.name}
-        isOwner={f.isOwner}
-        onRename={(n) => f.renameFamily(n).then(() => toast.success("Nome aggiornato")).catch((e) => toast.error(toUserMessage(e)))}
-      />
-
-      {f.isOwner && (
-        <InviteCodeCard
-          code={f.family.invite_code}
-          onRegenerate={() =>
-            f.regenerateCode().then(() => toast.success("Codice rigenerato")).catch((e) => toast.error(toUserMessage(e)))
-          }
+      {f.myInvites.length > 0 && (
+        <ReceivedInvites
+          invites={f.myInvites}
+          onAccept={(inv) => f.acceptInvite(inv).then(() => toast.success("Invito accettato")).catch((e) => toast.error(toUserMessage(e)))}
+          onDecline={(id) => f.declineInvite(id).then(() => toast.success("Invito rifiutato")).catch((e) => toast.error(toUserMessage(e)))}
         />
       )}
 
-      <MembersCard
-        members={f.members}
-        currentUserId={user?.id ?? ""}
-        ownerId={f.family.created_by}
-        isOwner={f.isOwner}
-        onRemove={(id) =>
-          f.removeMember(id).then(() => toast.success("Membro rimosso")).catch((e) => toast.error(toUserMessage(e)))
-        }
-      />
-
-      {f.isOwner && (
+      {!f.family ? (
+        <NoFamily onCreate={f.createFamily} onJoin={f.joinByCode} />
+      ) : (
         <>
-          <InvitesCard
-            invites={f.invites}
-            onInvite={(email) =>
-              f
-                .inviteByEmail(email)
-                .then(() => toast.success("Invito inviato"))
-                .catch((e) => toast.error(toUserMessage(e)))
-            }
-            onRevoke={(id) =>
-              f.revokeInvite(id).then(() => toast.success("Invito revocato")).catch((e) => toast.error(toUserMessage(e)))
-            }
+          <FamilyHeader
+            name={f.family.name}
+            isOwner={f.isOwner}
+            onRename={(n) => f.renameFamily(n).then(() => toast.success("Nome aggiornato")).catch((e) => toast.error(toUserMessage(e)))}
           />
-          <DangerZone
-            familyName={f.family.name}
-            onDelete={() =>
-              f
-                .deleteFamily()
-                .then(() => toast.success("Famiglia eliminata"))
-                .catch((e) => toast.error(toUserMessage(e)))
-            }
-          />
-        </>
-      )}
 
-      {!f.isOwner && (
-        <Card className="p-4">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="w-full">
-                <LogOut className="h-4 w-4 mr-2" /> Abbandona famiglia
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Non vedrai più i dati condivisi con questa famiglia.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() =>
-                    f.leaveFamily().then(() => toast.success("Hai abbandonato la famiglia")).catch((e) => toast.error(toUserMessage(e)))
-                  }
-                >
-                  Abbandona
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </Card>
+          {f.isOwner && (
+            <InviteCodeCard
+              code={f.family.invite_code}
+              onRegenerate={() =>
+                f.regenerateCode().then(() => toast.success("Codice rigenerato")).catch((e) => toast.error(toUserMessage(e)))
+              }
+            />
+          )}
+
+          <MembersCard
+            members={f.members}
+            currentUserId={user?.id ?? ""}
+            ownerId={f.family.created_by}
+            isOwner={f.isOwner}
+            onRemove={(id) =>
+              f.removeMember(id).then(() => toast.success("Membro rimosso")).catch((e) => toast.error(toUserMessage(e)))
+            }
+          />
+
+          {f.isOwner && (
+            <>
+              <InvitesCard
+                invites={f.invites}
+                onInvite={(email) =>
+                  f
+                    .inviteByEmail(email)
+                    .then(() => toast.success("Invito inviato"))
+                    .catch((e) => toast.error(toUserMessage(e)))
+                }
+                onRevoke={(id) =>
+                  f.revokeInvite(id).then(() => toast.success("Invito revocato")).catch((e) => toast.error(toUserMessage(e)))
+                }
+              />
+              <DangerZone
+                familyName={f.family.name}
+                onDelete={() =>
+                  f
+                    .deleteFamily()
+                    .then(() => toast.success("Famiglia eliminata"))
+                    .catch((e) => toast.error(toUserMessage(e)))
+                }
+              />
+            </>
+          )}
+
+          {!f.isOwner && (
+            <Card className="p-4">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="w-full">
+                    <LogOut className="h-4 w-4 mr-2" /> Abbandona famiglia
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Non vedrai più i dati condivisi con questa famiglia.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() =>
+                        f.leaveFamily().then(() => toast.success("Hai abbandonato la famiglia")).catch((e) => toast.error(toUserMessage(e)))
+                      }
+                    >
+                      Abbandona
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );
@@ -470,6 +484,80 @@ function DangerZone({ familyName, onDelete }: { familyName: string; onDelete: ()
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </Card>
+  );
+}
+
+function ReceivedInvites({
+  invites,
+  onAccept,
+  onDecline,
+}: {
+  invites: (FamilyInvite & { families: { name: string } | null })[];
+  onAccept: (inv: FamilyInvite) => Promise<unknown>;
+  onDecline: (id: string) => Promise<unknown>;
+}) {
+  const [busy, setBusy] = useState<{ id: string; action: "accept" | "decline" } | null>(null);
+
+  return (
+    <Card className="p-4 space-y-3 border-l-4 border-l-primary">
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary grid place-items-center">
+          <Bell className="h-4 w-4" />
+        </div>
+        <div className="text-sm font-medium">Inviti ricevuti</div>
+      </div>
+      <ul className="space-y-3">
+        {invites.map((inv) => (
+          <li key={inv.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">
+                Ti hanno invitato in <span className="text-primary">{inv.families?.name ?? "una famiglia"}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Scade il {new Date(inv.expires_at).toLocaleDateString("it-IT")}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy !== null}
+                onClick={() => {
+                  setBusy({ id: inv.id, action: "decline" });
+                  onDecline(inv.id)
+                    .then(() => setBusy(null))
+                    .catch(() => setBusy(null));
+                }}
+              >
+                {busy?.id === inv.id && busy.action === "decline" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <X className="h-3.5 w-3.5 mr-1" />
+                )}
+                Rifiuta
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy !== null}
+                onClick={() => {
+                  setBusy({ id: inv.id, action: "accept" });
+                  onAccept(inv)
+                    .then(() => setBusy(null))
+                    .catch(() => setBusy(null));
+                }}
+              >
+                {busy?.id === inv.id && busy.action === "accept" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                )}
+                Accetta
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
