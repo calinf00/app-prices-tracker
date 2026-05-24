@@ -456,15 +456,19 @@ function ShoppingListPage() {
     });
   }, [items, productStats, statsByName, aiCache, estimatePriceFn]);
 
-  // Totals
-  const total = items?.length ?? 0;
-  const done = items?.filter((i) => i.is_purchased).length ?? 0;
+  // Totals (over the visible scope)
+  const total = visibleItems.length;
+  const done = visibleItems.filter((i) => i.is_purchased).length;
+  const todo = total - done;
+  const assignedToMe = visibleItems.filter(
+    (i) => !i.is_purchased && user && i.assigned_to === user.id,
+  ).length;
   const progress = total === 0 ? 0 : (done / total) * 100;
 
   const { totalMin, totalMax } = useMemo(() => {
     let min = 0;
     let max = 0;
-    (items ?? [])
+    visibleItems
       .filter((i) => !i.is_purchased)
       .forEach((i) => {
         const r = getRange(i.product_name);
@@ -474,7 +478,7 @@ function ShoppingListPage() {
         max += estimateCost(r.max, rawQty, i.unit ?? "pz");
       });
     return { totalMin: min, totalMax: max };
-  }, [items, statsByName, aiCache]);
+  }, [visibleItems, statsByName, aiCache]);
 
   // Templates
   const saveAsTemplate = () => {
