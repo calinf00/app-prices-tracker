@@ -17,6 +17,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
+import { Switch } from "@/components/ui/switch";
+import { calcUnitPrices } from "@/lib/unit-conversion";
 
 export const Route = createFileRoute("/_authenticated/products/new")({
   component: NewProductPage,
@@ -39,6 +41,9 @@ function NewProductPage() {
   const [unit, setUnit] = useState<string>("pz");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [multiPack, setMultiPack] = useState(false);
+  const [itemsPerPack, setItemsPerPack] = useState<string>("");
+  const [volumePerItem, setVolumePerItem] = useState<string>("");
 
   const handleFile = (file: File) => {
     const r = new FileReader();
@@ -67,15 +72,34 @@ function NewProductPage() {
       if (pErr) throw pErr;
 
       if (price) {
-        const { error: puErr } = await supabase.from("purchases").insert({
+        const qty = Number(quantity) || 1;
+        const ipp = multiPack ? Math.max(1, Number(itemsPerPack) || 1) : 1;
+        const vpi = multiPack ? Number(volumePerItem) || 0 : 0;
+        const calc = calcUnitPrices(Number(price), qty, unit, ipp, vpi);
+        const base = {
           product_id: product.id,
           store_name: store.trim() || null,
           price: Number(price),
-          quantity: Number(quantity) || 1,
+          quantity: qty,
           unit,
           purchase_date: date,
           notes: notes.trim() || null,
-        });
+        };
+        const withUnitPrice = {
+          ...base,
+          price_per_base_unit: Number(calc.pricePerBaseUnit.toFixed(4)),
+          base_unit: calc.baseUnitLabel.replace("€/", ""),
+        };
+        let { error: puErr } = await supabase.from("purchases").insert(withUnitPrice);
+        if (puErr && /column|schema cache/i.test(puErr.message ?? "")) {
+          const retry = await supabase.from("purchases").insert(base);
+          puErr = retry.error;
+          if (!puErr) {
+            toast.warning(
+              "Colonne prezzo unitario non ancora disponibili — applica la migration Supabase",
+            );
+          }
+        }
         if (puErr) throw puErr;
       }
 
