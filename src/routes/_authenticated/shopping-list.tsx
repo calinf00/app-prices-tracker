@@ -1002,7 +1002,12 @@ function ShoppingItemCard({
     if (dx < 0) setOffset(Math.max(dx, -120));
   };
   const onTouchEnd = () => {
-    if (offset < -80 && onDelete) onDelete();
+    if (offset < -80 && onDelete) {
+      onDelete();
+      setOffset(-120);
+      startX.current = null;
+      return;
+    }
     setOffset(0);
     startX.current = null;
   };
@@ -1018,12 +1023,12 @@ function ShoppingItemCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
-      <div className="absolute inset-1 flex items-center justify-end pr-4 bg-destructive text-destructive-foreground rounded-lg">
+    <div className="relative overflow-hidden rounded-xl touch-pan-y">
+      <div className="absolute inset-1 flex items-center justify-end pr-5 bg-destructive text-destructive-foreground rounded-lg">
         <Trash2 className="h-4 w-4" />
       </div>
       <Card
-        className={`relative p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl ${
+        className={`relative z-10 p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl ${
           item.is_purchased ? "opacity-60" : ""
         }`}
         style={{ transform: `translateX(${offset}px)` }}
