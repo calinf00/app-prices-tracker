@@ -487,3 +487,77 @@ function DangerZone({ familyName, onDelete }: { familyName: string; onDelete: ()
     </Card>
   );
 }
+
+function ReceivedInvites({
+  invites,
+  onAccept,
+  onDecline,
+}: {
+  invites: (FamilyInvite & { families: { name: string } | null })[];
+  onAccept: (inv: FamilyInvite) => Promise<void>;
+  onDecline: (id: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<{ id: string; action: "accept" | "decline" } | null>(null);
+
+  return (
+    <Card className="p-4 space-y-3 border-l-4 border-l-primary">
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary grid place-items-center">
+          <Bell className="h-4 w-4" />
+        </div>
+        <div className="text-sm font-medium">Inviti ricevuti</div>
+      </div>
+      <ul className="space-y-3">
+        {invites.map((inv) => (
+          <li key={inv.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">
+                Ti hanno invitato in <span className="text-primary">{inv.families?.name ?? "una famiglia"}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Scade il {new Date(inv.expires_at).toLocaleDateString("it-IT")}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy !== null}
+                onClick={() => {
+                  setBusy({ id: inv.id, action: "decline" });
+                  onDecline(inv.id)
+                    .then(() => setBusy(null))
+                    .catch(() => setBusy(null));
+                }}
+              >
+                {busy?.id === inv.id && busy.action === "decline" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <X className="h-3.5 w-3.5 mr-1" />
+                )}
+                Rifiuta
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy !== null}
+                onClick={() => {
+                  setBusy({ id: inv.id, action: "accept" });
+                  onAccept(inv)
+                    .then(() => setBusy(null))
+                    .catch(() => setBusy(null));
+                }}
+              >
+                {busy?.id === inv.id && busy.action === "accept" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                )}
+                Accetta
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
