@@ -126,8 +126,10 @@ function DuplicatesPage() {
     return m;
   }, [products.data]);
 
-  const canonical = canonicalId ? productMap.get(canonicalId) : null;
-  const duplicate = duplicateId ? productMap.get(duplicateId) : null;
+  const canonical: ProductLite | null =
+    (canonicalId ? productMap.get(canonicalId) : null) ?? null;
+  const duplicate: ProductLite | null =
+    (duplicateId ? productMap.get(duplicateId) : null) ?? null;
 
   const merges = useQuery({
     queryKey: ["product-merges"],
