@@ -585,9 +585,9 @@ function ShoppingListPage() {
   };
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <h1 className="text-lg font-semibold truncate">Lista della Spesa</h1>
