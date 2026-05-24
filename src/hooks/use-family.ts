@@ -48,7 +48,8 @@ export function useFamily() {
               .from("family_invites")
               .select("*, families(name)")
               .eq("email", user.email!)
-              .eq("status", "pending"),
+              .eq("status", "pending")
+              .gt("expires_at", new Date().toISOString()),
           )
         : [];
       const myInvites = (myInvitesRaw ?? []) as (FamilyInvite & { families: { name: string } | null })[];
