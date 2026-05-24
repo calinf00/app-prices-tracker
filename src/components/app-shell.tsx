@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Camera, Package, ShoppingCart, Users, Settings, X } from "lucide-react";
+import { Home, Camera, Package, ShoppingCart, Users, Settings, X, Bot } from "lucide-react";
 import type { ReactNode } from "react";
 import { useFamily } from "@/hooks/use-family";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ const tabs: Tab[] = [
   { to: "/scan", label: "Scansiona", icon: Camera },
   { to: "/products", label: "Prodotti", icon: Package },
   { to: "/shopping-list", label: "Lista", icon: ShoppingCart },
-  { to: "/family", label: "Famiglia", icon: Users },
+  { to: "/assistant", label: "Assistente", icon: Bot },
 ];
 
 const titles: Record<string, string> = {
@@ -20,7 +20,7 @@ const titles: Record<string, string> = {
   "/scan": "Scansiona",
   "/products": "Prodotti",
   "/shopping-list": "Lista Spesa",
-  "/assistant": "Assistente",
+  "/assistant": "Assistente AI",
   "/settings": "Impostazioni",
   "/family": "Famiglia",
 };
@@ -42,13 +42,25 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex w-full max-w-[640px] items-center justify-between px-4 h-14">
           <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-          <Link
-            to="/settings"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            aria-label="Impostazioni"
-          >
-            <Settings className="h-5 w-5" />
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link
+              to="/family"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors relative"
+              aria-label="Famiglia"
+            >
+              <Users className="h-5 w-5" />
+              {pendingInvite && (
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-orange-500" />
+              )}
+            </Link>
+            <Link
+              to="/settings"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              aria-label="Impostazioni"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
         {pendingInvite && (
           <div className="mx-auto w-full max-w-[640px] px-4 pb-2">
@@ -98,7 +110,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active = exact
               ? pathname === to
               : pathname === to || pathname.startsWith(to + "/");
-            const showDot = to === "/family" && pendingInvite;
             return (
               <Link
                 key={to}
@@ -109,9 +120,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <span className="relative">
                   <Icon className={`h-5 w-5 ${active ? "stroke-[2.2]" : ""}`} />
-                  {showDot && (
-                    <span className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-orange-500" />
-                  )}
                 </span>
                 <span>{label}</span>
               </Link>
