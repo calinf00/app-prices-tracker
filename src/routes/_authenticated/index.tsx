@@ -263,7 +263,7 @@ function HomePage() {
             Nessun acquisto registrato.
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {data.recent.map((p) => {
               const Icon = iconForCategory(p.products?.category);
               const inner = (
@@ -310,7 +310,7 @@ function HomePage() {
             Nessuna variazione di prezzo rilevata.
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {data.alerts.map((a) => {
               const up = a.deltaPct > 0;
               return (
