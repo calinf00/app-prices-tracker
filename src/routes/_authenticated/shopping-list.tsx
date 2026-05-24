@@ -592,7 +592,8 @@ function ShoppingListPage() {
           <div className="min-w-0">
             <h1 className="text-lg font-semibold truncate">Lista della Spesa</h1>
             <p className="text-xs text-muted-foreground">
-              {done} di {total} acquistati
+              {total} articoli · {done} acquistati · {todo} da fare
+              {hasFamily && assignedToMe > 0 && ` · ${assignedToMe} assegnati a te`}
             </p>
           </div>
           <DropdownMenu>
@@ -634,6 +635,24 @@ function ShoppingListPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        {hasFamily && (
+          <div className="inline-flex rounded-md border border-border p-0.5 bg-muted/30 w-fit">
+            <button
+              type="button"
+              onClick={() => setScope("mine")}
+              className={`px-3 py-1 text-xs rounded ${scope === "mine" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              Solo i miei
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope("family")}
+              className={`px-3 py-1 text-xs rounded ${scope === "family" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              Tutta la famiglia
+            </button>
+          </div>
+        )}
         <Progress
           value={progress}
           className="h-2 [&>div]:bg-emerald-500 bg-emerald-500/15"
