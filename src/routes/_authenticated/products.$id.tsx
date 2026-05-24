@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -624,7 +624,7 @@ function ProductEditDialog({
         })
         .eq("id", product.id);
       if (error) throw error;
-      toast.success("Prodotto aggiornato ✅");
+      toast.success("Prodotto aggiornato");
       onSaved();
     } catch (e: any) {
       toast.error(toUserMessage(e, "Errore salvataggio"));
@@ -669,7 +669,7 @@ function ProductEditDialog({
             Annulla
           </Button>
           <Button onClick={save} disabled={saving}>
-            💾 Salva
+            <Save className="h-4 w-4 mr-1.5" /> Salva
           </Button>
         </DialogFooter>
       </DialogContent>

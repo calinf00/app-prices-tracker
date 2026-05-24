@@ -659,7 +659,7 @@ function ShoppingListPage() {
         }}
       >
         <Sparkles className="h-4 w-4 mr-2" />
-        🤖 Genera lista con AI
+        Genera lista con AI
       </Button>
 
       {/* List */}
