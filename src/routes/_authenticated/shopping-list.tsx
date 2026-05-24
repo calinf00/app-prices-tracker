@@ -973,12 +973,20 @@ function ShoppingItemCard({
   onToggle,
   onDelete,
   onUpdate,
+  addedBy,
+  assignee,
+  canAssignToMe,
+  onAssignToMe,
 }: {
   item: Item;
   range: PriceRange | null;
   onToggle: (v: boolean) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onUpdate: (quantity: number, unit: string) => void;
+  addedBy?: { user_id: string; display_name: string; email: string } | null;
+  assignee?: { user_id: string; display_name: string; email: string } | null;
+  canAssignToMe?: boolean;
+  onAssignToMe?: () => void;
 }) {
   const startX = useRef<number | null>(null);
   const [offset, setOffset] = useState(0);
@@ -995,7 +1003,7 @@ function ShoppingItemCard({
     if (dx < 0) setOffset(Math.max(dx, -120));
   };
   const onTouchEnd = () => {
-    if (offset < -80) onDelete();
+    if (offset < -80 && onDelete) onDelete();
     setOffset(0);
     startX.current = null;
   };
