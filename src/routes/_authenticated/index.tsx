@@ -190,6 +190,20 @@ function HomePage() {
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
       </section>
 
+      {/* AI Assistant quick access */}
+      <Link to="/assistant">
+        <Card className="p-3 flex items-center gap-3 border-primary/20 hover:border-primary/40 transition-colors bg-primary/5">
+          <div className="h-10 w-10 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-medium text-sm">Assistente AI</div>
+            <div className="text-xs text-muted-foreground">Chiedi consigli sulla spesa, analizza i prezzi</div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+        </Card>
+      </Link>
+
       {/* Search */}
       <section className="space-y-2">
         <div className="relative">
