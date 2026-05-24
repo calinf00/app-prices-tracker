@@ -470,19 +470,25 @@ function ShoppingListPage() {
   ).length;
   const progress = total === 0 ? 0 : (done / total) * 100;
 
-  const { totalMin, totalMax } = useMemo(() => {
+  const { totalMin, totalMax, allMin, allMax } = useMemo(() => {
     let min = 0;
     let max = 0;
-    visibleItems
-      .filter((i) => !i.is_purchased)
-      .forEach((i) => {
-        const r = getRange(i.product_name);
-        if (!r) return;
-        const rawQty = i.quantity ?? 1;
-        min += estimateCost(r.min, rawQty, i.unit ?? "pz");
-        max += estimateCost(r.max, rawQty, i.unit ?? "pz");
-      });
-    return { totalMin: min, totalMax: max };
+    let aMin = 0;
+    let aMax = 0;
+    visibleItems.forEach((i) => {
+      const r = getRange(i.product_name);
+      if (!r) return;
+      const rawQty = i.quantity ?? 1;
+      const cMin = estimateCost(r.min, rawQty, i.unit ?? "pz");
+      const cMax = estimateCost(r.max, rawQty, i.unit ?? "pz");
+      aMin += cMin;
+      aMax += cMax;
+      if (!i.is_purchased) {
+        min += cMin;
+        max += cMax;
+      }
+    });
+    return { totalMin: min, totalMax: max, allMin: aMin, allMax: aMax };
   }, [visibleItems, statsByName, aiCache]);
 
   // Templates
