@@ -83,15 +83,25 @@ function ProductDetailPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["product", id],
     queryFn: async () => {
-      const [{ data: product, error: e1 }, { data: purchases, error: e2 }] =
-        await Promise.all([
-          supabase.from("products").select("id, name, brand, category, image_url").eq("id", id).single(),
-          supabase
-            .from("purchases")
-            .select("id, store_name, price, quantity, unit, purchase_date, notes, price_per_base_unit, base_unit")
-            .eq("product_id", id)
-            .order("purchase_date", { ascending: true }),
-        ]);
+      const productPromise = supabase
+        .from("products")
+        .select("id, name, brand, category, image_url")
+        .eq("id", id)
+        .single();
+      let purchasesRes = await supabase
+        .from("purchases")
+        .select("id, store_name, price, quantity, unit, purchase_date, notes, price_per_base_unit, base_unit")
+        .eq("product_id", id)
+        .order("purchase_date", { ascending: true });
+      if (purchasesRes.error && /column|schema cache/i.test(purchasesRes.error.message ?? "")) {
+        purchasesRes = await supabase
+          .from("purchases")
+          .select("id, store_name, price, quantity, unit, purchase_date, notes")
+          .eq("product_id", id)
+          .order("purchase_date", { ascending: true });
+      }
+      const { data: product, error: e1 } = await productPromise;
+      const { data: purchases, error: e2 } = purchasesRes;
       if (e1) throw e1;
       if (e2) throw e2;
       return {
