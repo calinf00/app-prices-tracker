@@ -706,6 +706,12 @@ function ScanPage() {
             )}
           </DialogContent>
         </Dialog>
+        <ProductDedupModal
+          open={dedupOpen}
+          pairs={dedupPairs}
+          onResolved={handleDedupResolved}
+          onClose={handleDedupResolved}
+        />
       </div>
     );
   }
