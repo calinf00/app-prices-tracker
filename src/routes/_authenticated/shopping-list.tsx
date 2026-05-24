@@ -1045,6 +1045,28 @@ function ShoppingItemCard({
           >
             {item.product_name}
           </div>
+          {(addedBy || assignee) && (
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              {addedBy && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <FamilyAvatar
+                    name={addedBy.display_name || addedBy.email}
+                    userId={addedBy.user_id}
+                    size="xs"
+                  />
+                  <span className="truncate max-w-[100px]">
+                    {addedBy.display_name || addedBy.email}
+                  </span>
+                </span>
+              )}
+              {assignee && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px]">
+                  <UserPlus className="h-2.5 w-2.5" />
+                  {assignee.display_name || assignee.email}
+                </span>
+              )}
+            </div>
+          )}
           {editing ? (
             <div className="flex items-center gap-1 mt-1">
               <Input
@@ -1132,6 +1154,18 @@ function ShoppingItemCard({
         </div>
         {!editing && (
           <>
+            {canAssignToMe && onAssignToMe && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                onClick={onAssignToMe}
+                aria-label="Assegna a me"
+                title="Assegna a me"
+              >
+                <UserPlus className="h-4 w-4 text-primary" />
+              </Button>
+            )}
             <Button
               size="icon"
               variant="ghost"
@@ -1141,15 +1175,17 @@ function ShoppingItemCard({
             >
               <Pencil className="h-4 w-4 text-muted-foreground" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={onDelete}
-              aria-label="Elimina"
-            >
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-            </Button>
+            {onDelete && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                onClick={onDelete}
+                aria-label="Elimina"
+              >
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
           </>
         )}
       </Card>
