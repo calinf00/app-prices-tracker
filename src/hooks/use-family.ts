@@ -97,7 +97,10 @@ export function useFamily() {
     return data.members.find((m) => m.user_id === userId) ?? null;
   };
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["family"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["family"] });
+    qc.invalidateQueries({ queryKey: ["invite-count"] });
+  };
 
   const createFamily = useMutation({
     mutationFn: async (name: string) => {
