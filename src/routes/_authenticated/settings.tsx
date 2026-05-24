@@ -176,17 +176,21 @@ function SettingsPage() {
         <div className="text-xs text-muted-foreground break-all">{user?.email}</div>
         <div className="space-y-1">
           <Label htmlFor="name" className="text-xs">Nome visualizzato</Label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-stretch gap-2">
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Il tuo nome"
               maxLength={60}
-              className="h-11"
+              className="h-11 flex-1 min-w-0"
               aria-invalid={!!nameError}
             />
-            <Button onClick={saveName} disabled={savingName || !!nameError} className="h-11">
+            <Button
+              onClick={saveName}
+              disabled={savingName || !!nameError}
+              className="h-auto min-h-[44px] shrink-0 whitespace-nowrap min-w-[80px] w-full sm:w-auto"
+            >
               <Save className="h-4 w-4 mr-1" /> Salva
             </Button>
           </div>

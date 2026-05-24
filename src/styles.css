@@ -143,14 +143,13 @@
   }
 }
 
-/* Mobile button overflow guard: prevent action button text from spilling
-   outside button boundaries on narrow viewports. */
-@media (max-width: 390px) {
-  button {
+/* Mobile button overflow fix */
+@media (max-width: 430px) {
+  button,
+  [role="button"] {
     white-space: normal;
     word-break: break-word;
-    height: auto;
-    min-height: 2.75rem;
-    padding: 0.5rem 0.75rem;
+    min-height: 44px;
+    height: auto !important;
   }
 }
