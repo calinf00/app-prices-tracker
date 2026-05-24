@@ -470,19 +470,25 @@ function ShoppingListPage() {
   ).length;
   const progress = total === 0 ? 0 : (done / total) * 100;
 
-  const { totalMin, totalMax } = useMemo(() => {
+  const { totalMin, totalMax, allMin, allMax } = useMemo(() => {
     let min = 0;
     let max = 0;
-    visibleItems
-      .filter((i) => !i.is_purchased)
-      .forEach((i) => {
-        const r = getRange(i.product_name);
-        if (!r) return;
-        const rawQty = i.quantity ?? 1;
-        min += estimateCost(r.min, rawQty, i.unit ?? "pz");
-        max += estimateCost(r.max, rawQty, i.unit ?? "pz");
-      });
-    return { totalMin: min, totalMax: max };
+    let aMin = 0;
+    let aMax = 0;
+    visibleItems.forEach((i) => {
+      const r = getRange(i.product_name);
+      if (!r) return;
+      const rawQty = i.quantity ?? 1;
+      const cMin = estimateCost(r.min, rawQty, i.unit ?? "pz");
+      const cMax = estimateCost(r.max, rawQty, i.unit ?? "pz");
+      aMin += cMin;
+      aMax += cMax;
+      if (!i.is_purchased) {
+        min += cMin;
+        max += cMax;
+      }
+    });
+    return { totalMin: min, totalMax: max, allMin: aMin, allMax: aMax };
   }, [visibleItems, statsByName, aiCache]);
 
   // Templates
@@ -662,12 +668,22 @@ function ShoppingListPage() {
           value={progress}
           className="h-2 [&>div]:bg-emerald-500 bg-emerald-500/15"
         />
-        {(totalMin > 0 || totalMax > 0) && (
-          <div className="text-sm flex items-baseline gap-2">
-            <span className="text-muted-foreground">Spesa stimata:</span>
-            <span className="font-semibold tabular-nums">
-              €{totalMin.toFixed(2)} - €{totalMax.toFixed(2)}
-            </span>
+        {(allMin > 0 || allMax > 0) && (
+          <div className="text-sm space-y-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-muted-foreground">Totale lista:</span>
+              <span className="font-semibold tabular-nums">
+                €{allMin.toFixed(2)} - €{allMax.toFixed(2)}
+              </span>
+            </div>
+            {(totalMin > 0 || totalMax > 0) && (
+              <div className="flex items-baseline gap-2">
+                <span className="text-muted-foreground">Da acquistare:</span>
+                <span className="font-semibold tabular-nums">
+                  €{totalMin.toFixed(2)} - €{totalMax.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </Card>
