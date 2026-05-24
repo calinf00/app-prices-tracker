@@ -205,6 +205,17 @@ function NewProductPage() {
             </Select>
           </div>
         </div>
+        <UnitPriceFields
+          price={price}
+          quantity={quantity}
+          unit={unit}
+          multiPack={multiPack}
+          setMultiPack={setMultiPack}
+          itemsPerPack={itemsPerPack}
+          setItemsPerPack={setItemsPerPack}
+          volumePerItem={volumePerItem}
+          setVolumePerItem={setVolumePerItem}
+        />
         <div>
           <Label className="text-xs">Note</Label>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opzionale" rows={2} />
@@ -218,5 +229,94 @@ function NewProductPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export function UnitPriceFields({
+  price,
+  quantity,
+  unit,
+  multiPack,
+  setMultiPack,
+  itemsPerPack,
+  setItemsPerPack,
+  volumePerItem,
+  setVolumePerItem,
+}: {
+  price: string;
+  quantity: string;
+  unit: string;
+  multiPack: boolean;
+  setMultiPack: (v: boolean) => void;
+  itemsPerPack: string;
+  setItemsPerPack: (v: string) => void;
+  volumePerItem: string;
+  setVolumePerItem: (v: string) => void;
+}) {
+  const unitLabel =
+    unit === "l" || unit === "ml" ? "litri" : unit === "kg" || unit === "g" ? "kg" : "pezzi";
+  const isWeightOrVolume = ["kg", "g", "l", "ml"].includes(unit);
+  const p = Number(price);
+  const preview =
+    Number.isFinite(p) && p > 0
+      ? calcUnitPrices(
+          p,
+          Number(quantity) || 1,
+          unit,
+          multiPack ? Math.max(1, Number(itemsPerPack) || 1) : 1,
+          multiPack ? Number(volumePerItem) || 0 : 0,
+        )
+      : null;
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-md border border-border p-2">
+        <Label htmlFor="multipack" className="text-xs cursor-pointer">
+          Confezione multipla?
+        </Label>
+        <Switch id="multipack" checked={multiPack} onCheckedChange={setMultiPack} />
+      </div>
+      {multiPack && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">N° pezzi nella confezione</Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="Es. 6"
+              value={itemsPerPack}
+              onChange={(e) => setItemsPerPack(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Per pezzo (in {unitLabel})</Label>
+            <Input
+              type="number"
+              step="0.001"
+              placeholder="Es. 1.5"
+              value={volumePerItem}
+              onChange={(e) => setVolumePerItem(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      {preview && (
+        <div className="rounded-md bg-muted/60 p-2 text-xs space-y-0.5">
+          <div className="font-medium text-muted-foreground">Riepilogo prezzi unitari</div>
+          <div>
+            Totale: €{p.toFixed(2)} per {quantity || 1} {unit}
+          </div>
+          {preview.pricePerPiece !== null && (
+            <div>Prezzo al pezzo: €{preview.pricePerPiece.toFixed(2)}</div>
+          )}
+          {(isWeightOrVolume || (multiPack && Number(volumePerItem) > 0)) && (
+            <div>
+              Prezzo al {preview.baseUnitLabel.replace("€/", "")}: €
+              {preview.pricePerBaseUnit.toFixed(2)}
+              {preview.baseUnitLabel}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }
