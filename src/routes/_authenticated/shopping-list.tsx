@@ -62,7 +62,13 @@ type Item = {
   created_at?: string;
 };
 
-type PriceRange = { min: number; max: number; source: "history" | "ai" };
+type PriceRange = {
+  min: number;
+  max: number;
+  source: "history" | "ai";
+  /** Unit the price refers to (e.g. "kg", "l", "pz"). Used to convert when the item is in g/ml. */
+  priceUnit?: string;
+};
 
 type ProductStat = {
   id: string;
