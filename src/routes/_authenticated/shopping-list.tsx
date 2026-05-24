@@ -1157,12 +1157,12 @@ function ShoppingItemCard({
           )}
         </div>
         {!editing && (
-          <>
+          <div className="ml-2 flex shrink-0 items-center gap-2 self-stretch">
             {canAssignToMe && onAssignToMe && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9"
+                className="h-9 w-9 shrink-0"
                 onClick={onAssignToMe}
                 aria-label="Assegna a me"
                 title="Assegna a me"
@@ -1173,7 +1173,7 @@ function ShoppingItemCard({
             <Button
               size="icon"
               variant="ghost"
-              className="h-9 w-9"
+              className="h-9 w-9 shrink-0"
               onClick={() => setEditing(true)}
               aria-label="Modifica"
             >
@@ -1183,14 +1183,14 @@ function ShoppingItemCard({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9"
+                className="h-9 w-9 shrink-0"
                 onClick={onDelete}
                 aria-label="Elimina"
               >
                 <Trash2 className="h-4 w-4 text-muted-foreground" />
               </Button>
             )}
-          </>
+          </div>
         )}
       </Card>
     </div>
