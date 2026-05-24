@@ -254,22 +254,19 @@ export function useFamily() {
   const acceptInvite = useMutation({
     mutationFn: async (invite: FamilyInvite) => {
       if (!user) throw new Error("Non autenticato");
+      const { error: updErr } = await supabase
+        .from("family_invites")
+        .update({ status: "accepted" })
+        .eq("id", invite.id);
+      if (updErr) throw updErr;
       const { error: insErr } = await supabase.from("family_members").insert({
         family_id: invite.family_id,
         user_id: user.id,
         role: "member",
-        display_name:
-          (user.user_metadata as { full_name?: string } | null)?.full_name ||
-          user.email?.split("@")[0] ||
-          "Membro",
+        display_name: user.email || "",
         email: user.email || "",
       });
       if (insErr && !String(insErr.message).includes("duplicate")) throw insErr;
-      const { error } = await supabase
-        .from("family_invites")
-        .update({ status: "accepted" })
-        .eq("id", invite.id);
-      if (error) throw error;
     },
     onSuccess: invalidate,
   });
