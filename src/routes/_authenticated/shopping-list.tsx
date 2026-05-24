@@ -340,7 +340,11 @@ function ShoppingListPage() {
       const { error } = await supabase.from("shopping_list").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping_list"] }),
+    onSuccess: (_, id) => {
+      qc.setQueryData<Item[]>(["shopping_list"], (old) => old?.filter((item) => item.id !== id) ?? []);
+      qc.invalidateQueries({ queryKey: ["shopping_list"] });
+    },
+    onError: (e: Error) => toast.error(toUserMessage(e)),
   });
 
   const updateItem = useMutation({
