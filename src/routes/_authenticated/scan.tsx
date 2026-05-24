@@ -303,6 +303,7 @@ function ScanPage() {
     }
     setSaving(true);
     try {
+      const newlyCreated: { id: string; name: string }[] = [];
       for (const [idx, item] of selected.entries()) {
         const cleanName = item.name_full.trim();
         console.log(`[scan.save] (${idx + 1}/${selected.length}) lookup`, cleanName);
@@ -315,6 +316,7 @@ function ScanPage() {
           .ilike("name", cleanName)
           .limit(1);
         let productId = matches?.[0]?.id;
+        let wasCreated = false;
         if (!productId) {
           console.log("[scan.save] creating product", cleanName);
           const { data: created, error: pErr } = await supabase
@@ -337,7 +339,11 @@ function ScanPage() {
             }
           } else {
             productId = created.id;
+            wasCreated = true;
           }
+        }
+        if (wasCreated && productId) {
+          newlyCreated.push({ id: productId, name: cleanName });
         }
         const purchasePayload: any = {
           product_id: productId,
@@ -359,16 +365,80 @@ function ScanPage() {
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       qc.invalidateQueries({ queryKey: ["known-stores"] });
-      setTimeout(() => {
-        resetAll();
-        navigate({ to: "/" });
-      }, 1500);
+
+      // Run AI dedup over the newly created products against the rest of the catalog.
+      const candidates = await runDedupCheck(newlyCreated);
+      if (candidates.length > 0) {
+        setDedupPairs(candidates);
+        setDedupOpen(true);
+      } else {
+        setTimeout(() => {
+          resetAll();
+          navigate({ to: "/" });
+        }, 1200);
+      }
     } catch (e: any) {
       console.error("[scan.save] failed", e);
       toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
     }
+  };
+
+  async function runDedupCheck(
+    newlyCreated: { id: string; name: string }[],
+  ): Promise<DedupPair[]> {
+    if (newlyCreated.length === 0) return [];
+    try {
+      const newIds = new Set(newlyCreated.map((n) => n.id));
+      const { data: existing } = await supabase
+        .from("products")
+        .select("id, name, merged_into")
+        .is("merged_into", null)
+        .limit(500);
+      const others = (existing ?? []).filter((p: any) => !newIds.has(p.id));
+      if (others.length === 0) return [];
+
+      const { data: dismissedRows } = await supabase
+        .from("product_dedup_dismissed")
+        .select("product_id_a, product_id_b");
+      const dismissedSet = new Set(
+        (dismissedRows ?? []).map((r: any) =>
+          [r.product_id_a, r.product_id_b].sort().join("|"),
+        ),
+      );
+
+      const { candidates } = await findSimilar({
+        data: {
+          newProductNames: newlyCreated.map((n) => n.name),
+          existingProducts: others.map((p: any) => ({ id: p.id, name: p.name })),
+        },
+      });
+
+      const nameToId = new Map(newlyCreated.map((n) => [n.name, n.id]));
+      return candidates
+        .map((c) => {
+          const newId = nameToId.get(c.newProductName);
+          if (!newId) return null;
+          const key = [newId, c.existingProductId].sort().join("|");
+          if (dismissedSet.has(key)) return null;
+          return { ...c, newProductId: newId } as DedupPair;
+        })
+        .filter((x): x is DedupPair => x !== null);
+    } catch (e) {
+      console.warn("[scan.dedup] check failed", e);
+      return [];
+    }
+  }
+
+  const handleDedupResolved = () => {
+    setDedupOpen(false);
+    setDedupPairs([]);
+    qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+    setTimeout(() => {
+      resetAll();
+      navigate({ to: "/" });
+    }, 500);
   };
 
   // -------- RENDER --------
