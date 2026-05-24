@@ -232,6 +232,19 @@ export function useFamily() {
     mutationFn: async (email: string) => {
       if (!user || !data.family) throw new Error("Nessuna famiglia");
       const normalized = email.trim().toLowerCase();
+      // Blocca se l'email è già membro della famiglia
+      const { data: existingMember, error: memCheckErr } = await supabase
+        .from("family_members")
+        .select("id")
+        .eq("family_id", data.family.id)
+        .eq("email", normalized)
+        .maybeSingle();
+      if (memCheckErr && (memCheckErr as { code?: string }).code !== "PGRST116") {
+        throw memCheckErr;
+      }
+      if (existingMember) {
+        throw new Error("Questa email è già membro della famiglia.");
+      }
       // Rimuovi eventuali inviti precedenti (revocati/scaduti) per evitare unique conflict
       await supabase
         .from("family_invites")
@@ -253,7 +266,7 @@ export function useFamily() {
     mutationFn: async (inviteId: string) => {
       const { error } = await supabase
         .from("family_invites")
-        .delete()
+        .update({ status: "revoked" })
         .eq("id", inviteId);
       if (error) throw error;
     },
@@ -263,19 +276,29 @@ export function useFamily() {
   const acceptInvite = useMutation({
     mutationFn: async (invite: FamilyInvite) => {
       if (!user) throw new Error("Non autenticato");
-      const { error: updErr } = await supabase
+      const nowIso = new Date().toISOString();
+      const { data: updated, error: updErr } = await supabase
         .from("family_invites")
         .update({ status: "accepted" })
-        .eq("id", invite.id);
+        .eq("id", invite.id)
+        .eq("status", "pending")
+        .gt("expires_at", nowIso)
+        .select("id");
       if (updErr) throw updErr;
+      if (!updated || updated.length === 0) {
+        throw new Error("Invito non valido o scaduto.");
+      }
       const { error: insErr } = await supabase.from("family_members").insert({
         family_id: invite.family_id,
         user_id: user.id,
         role: "member",
-        display_name: user.email || "",
+        display_name:
+          (user.user_metadata as { full_name?: string } | null)?.full_name ||
+          user.email?.split("@")[0] ||
+          "Membro",
         email: user.email || "",
       });
-      if (insErr && !String(insErr.message).includes("duplicate")) throw insErr;
+      if (insErr && (insErr as { code?: string }).code !== "23505") throw insErr;
     },
     onSuccess: invalidate,
   });
