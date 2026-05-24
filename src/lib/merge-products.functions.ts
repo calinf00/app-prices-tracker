@@ -29,7 +29,10 @@ export const mergeProductsFn = createServerFn({ method: "POST" })
       .from("purchases")
       .update({ product_id: data.canonicalProductId })
       .eq("product_id", data.mergedProductId);
-    if (e1) throw new Error(`Errore aggiornamento acquisti: ${e1.message}`);
+    if (e1) {
+      console.error("[mergeProducts] purchases update failed", e1);
+      throw new Error("Errore durante l'unione dei prodotti, riprova.");
+    }
 
     // Repoint shopping_list
     const { error: e2 } = await supabase
@@ -43,7 +46,10 @@ export const mergeProductsFn = createServerFn({ method: "POST" })
       .from("products")
       .update({ merged_into: data.canonicalProductId })
       .eq("id", data.mergedProductId);
-    if (e3) throw new Error(`Errore aggiornamento prodotto: ${e3.message}`);
+    if (e3) {
+      console.error("[mergeProducts] products update failed", e3);
+      throw new Error("Errore durante l'unione dei prodotti, riprova.");
+    }
 
     // Record mapping (upsert via unique constraint)
     const { error: e4 } = await supabase
@@ -56,7 +62,10 @@ export const mergeProductsFn = createServerFn({ method: "POST" })
         },
         { onConflict: "user_id,merged_product_id" },
       );
-    if (e4) throw new Error(`Errore registrazione merge: ${e4.message}`);
+    if (e4) {
+      console.error("[mergeProducts] merge map upsert failed", e4);
+      throw new Error("Errore durante l'unione dei prodotti, riprova.");
+    }
 
     return { ok: true };
   });
@@ -77,12 +86,18 @@ export const unmergeProductsFn = createServerFn({ method: "POST" })
       .from("products")
       .update({ merged_into: null })
       .eq("id", data.mergedProductId);
-    if (e1) throw new Error(e1.message);
+    if (e1) {
+      console.error("[unmergeProducts] products update failed", e1);
+      throw new Error("Errore durante l'annullamento dell'unione, riprova.");
+    }
     const { error: e2 } = await supabase
       .from("product_merge_map")
       .delete()
       .eq("merged_product_id", data.mergedProductId);
-    if (e2) throw new Error(e2.message);
+    if (e2) {
+      console.error("[unmergeProducts] merge map delete failed", e2);
+      throw new Error("Errore durante l'annullamento dell'unione, riprova.");
+    }
     return { ok: true };
   });
 
@@ -103,7 +118,10 @@ export const dismissDedupPairFn = createServerFn({ method: "POST" })
         { user_id: userId, product_id_a: a, product_id_b: b },
         { onConflict: "user_id,product_id_a,product_id_b" },
       );
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("[dismissDedupPair] upsert failed", error);
+      throw new Error("Errore durante l'operazione, riprova.");
+    }
     return { ok: true };
   });
 
@@ -116,6 +134,9 @@ export const removeDismissedPairFn = createServerFn({ method: "POST" })
       .from("product_dedup_dismissed")
       .delete()
       .eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("[removeDismissedPair] delete failed", error);
+      throw new Error("Errore durante l'operazione, riprova.");
+    }
     return { ok: true };
   });
