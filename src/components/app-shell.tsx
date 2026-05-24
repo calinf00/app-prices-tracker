@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Camera, Package, ShoppingCart, Users, Settings, X } from "lucide-react";
+import { Home, Camera, Package, ShoppingCart, Users, Settings, X, Bot } from "lucide-react";
 import type { ReactNode } from "react";
 import { useFamily } from "@/hooks/use-family";
 import { Button } from "@/components/ui/button";
