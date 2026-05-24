@@ -12,7 +12,7 @@ const tabs: Tab[] = [
   { to: "/scan", label: "Scansiona", icon: Camera },
   { to: "/products", label: "Prodotti", icon: Package },
   { to: "/shopping-list", label: "Lista", icon: ShoppingCart },
-  { to: "/family", label: "Famiglia", icon: Users },
+  { to: "/assistant", label: "Assistente", icon: Bot },
 ];
 
 const titles: Record<string, string> = {
@@ -20,7 +20,7 @@ const titles: Record<string, string> = {
   "/scan": "Scansiona",
   "/products": "Prodotti",
   "/shopping-list": "Lista Spesa",
-  "/assistant": "Assistente",
+  "/assistant": "Assistente AI",
   "/settings": "Impostazioni",
   "/family": "Famiglia",
 };
