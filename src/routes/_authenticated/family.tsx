@@ -213,7 +213,7 @@ function NoFamily({
               await onCreate(name);
               toast.success("Famiglia creata");
             } catch (e) {
-              const msg = (e as Error).message || toUserMessage(e as Error);
+              const msg = toUserMessage(e as Error);
               setCreateError(msg);
               toast.error(msg);
             } finally {

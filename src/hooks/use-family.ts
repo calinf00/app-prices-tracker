@@ -130,7 +130,7 @@ export function useFamily() {
         if (code === "42501") {
           throw new Error("Permessi insufficienti. Controlla le policy RLS su Supabase.");
         }
-        throw new Error(error.message);
+        throw new Error("Impossibile creare la famiglia. Riprova più tardi.");
       }
       const { error: memErr } = await supabase.from("family_members").insert({
         family_id: (fam as Family).id,
@@ -143,7 +143,7 @@ export function useFamily() {
         email: user.email || "",
       });
       if (memErr)
-        throw new Error("Famiglia creata ma errore nell'aggiunta come membro: " + memErr.message);
+        throw new Error("Famiglia creata ma non è stato possibile aggiungerti come membro.");
     },
     onSuccess: invalidate,
   });
