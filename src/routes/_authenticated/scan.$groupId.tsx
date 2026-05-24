@@ -36,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/user-errors";
 import { decodeReceiptKey, encodeReceiptKey } from "@/lib/receipt-key";
 import { UNITS } from "@/lib/categories";
+import { calcUnitPrices } from "@/lib/unit-conversion";
 
 export const Route = createFileRoute("/_authenticated/scan/$groupId")({
   component: ReceiptDetailPage,
@@ -468,15 +469,19 @@ function PurchaseEditDialog({
         .eq("id", purchase.product_id);
       if (productError) throw productError;
 
+      const qty = Number(quantity) || 1;
+      const calc = calcUnitPrices(Number(price), qty, unit);
       const { error: purchaseError } = await supabase
         .from("purchases")
         .update({
           store_name: store.trim() || null,
           price: Number(price),
-          quantity: Number(quantity) || 1,
+          quantity: qty,
           unit,
           purchase_date: date,
           notes: notes.trim() || null,
+          price_per_base_unit: Number(calc.pricePerBaseUnit.toFixed(4)),
+          base_unit: calc.baseUnitLabel.replace("€/", ""),
         })
         .eq("id", purchase.id);
       if (purchaseError) throw purchaseError;
@@ -484,7 +489,8 @@ function PurchaseEditDialog({
       toast.success("Prodotto dello scontrino aggiornato");
       onSaved(purchase.product_id);
     } catch (e: any) {
-      toast.error(toUserMessage(e, "Errore salvataggio"));
+      console.error("[scan.receipt.edit] save failed", e);
+      toast.error(e?.message || "Errore salvataggio");
     } finally {
       setSaving(false);
     }
