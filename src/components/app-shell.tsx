@@ -1,6 +1,10 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Camera, Package, ShoppingCart, Bot, Settings } from "lucide-react";
+import { Home, Camera, Package, ShoppingCart, Users, Settings, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useFamily } from "@/hooks/use-family";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { toUserMessage } from "@/lib/user-errors";
 
 type Tab = { to: string; label: string; icon: typeof Home; exact?: boolean };
 const tabs: Tab[] = [
@@ -8,7 +12,7 @@ const tabs: Tab[] = [
   { to: "/scan", label: "Scansiona", icon: Camera },
   { to: "/products", label: "Prodotti", icon: Package },
   { to: "/shopping-list", label: "Lista", icon: ShoppingCart },
-  { to: "/assistant", label: "Assistente", icon: Bot },
+  { to: "/family", label: "Famiglia", icon: Users },
 ];
 
 const titles: Record<string, string> = {
@@ -18,6 +22,7 @@ const titles: Record<string, string> = {
   "/shopping-list": "Lista Spesa",
   "/assistant": "Assistente",
   "/settings": "Impostazioni",
+  "/family": "Famiglia",
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -26,6 +31,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const title =
     titles[pathname] ??
     (pathname.startsWith("/products/") ? "Dettaglio prodotto" : "App Prezzi");
+
+  const family = useFamily();
+  const pendingInvite = family.myInvites?.[0] as
+    | (typeof family.myInvites)[number]
+    | undefined;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -40,6 +50,39 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Settings className="h-5 w-5" />
           </Link>
         </div>
+        {pendingInvite && (
+          <div className="mx-auto w-full max-w-[640px] px-4 pb-2">
+            <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <Users className="h-4 w-4 text-primary shrink-0" />
+              <div className="flex-1 min-w-0 truncate">
+                Invito a unirti a "{pendingInvite.families?.name ?? "una famiglia"}"
+              </div>
+              <Button
+                size="sm"
+                onClick={() =>
+                  family
+                    .acceptInvite(pendingInvite)
+                    .then(() => toast.success("Invito accettato"))
+                    .catch((e) => toast.error(toUserMessage(e as Error)))
+                }
+              >
+                Accetta
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  family
+                    .declineInvite(pendingInvite.id)
+                    .then(() => toast.success("Invito rifiutato"))
+                    .catch((e) => toast.error(toUserMessage(e as Error)))
+                }
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </header>
 
       <main
@@ -55,6 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active = exact
               ? pathname === to
               : pathname === to || pathname.startsWith(to + "/");
+            const showDot = to === "/family" && pendingInvite;
             return (
               <Link
                 key={to}
@@ -63,7 +107,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Icon className={`h-5 w-5 ${active ? "stroke-[2.2]" : ""}`} />
+                <span className="relative">
+                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.2]" : ""}`} />
+                  {showDot && (
+                    <span className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-orange-500" />
+                  )}
+                </span>
                 <span>{label}</span>
               </Link>
             );
