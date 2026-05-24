@@ -668,12 +668,22 @@ function ShoppingListPage() {
           value={progress}
           className="h-2 [&>div]:bg-emerald-500 bg-emerald-500/15"
         />
-        {(totalMin > 0 || totalMax > 0) && (
-          <div className="text-sm flex items-baseline gap-2">
-            <span className="text-muted-foreground">Spesa stimata:</span>
-            <span className="font-semibold tabular-nums">
-              €{totalMin.toFixed(2)} - €{totalMax.toFixed(2)}
-            </span>
+        {(allMin > 0 || allMax > 0) && (
+          <div className="text-sm space-y-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-muted-foreground">Totale lista:</span>
+              <span className="font-semibold tabular-nums">
+                €{allMin.toFixed(2)} - €{allMax.toFixed(2)}
+              </span>
+            </div>
+            {(totalMin > 0 || totalMax > 0) && (
+              <div className="flex items-baseline gap-2">
+                <span className="text-muted-foreground">Da acquistare:</span>
+                <span className="font-semibold tabular-nums">
+                  €{totalMin.toFixed(2)} - €{totalMax.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </Card>
