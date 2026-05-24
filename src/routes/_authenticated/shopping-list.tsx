@@ -337,10 +337,15 @@ function ShoppingListPage() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("shopping_list").delete().eq("id", id);
+      const { data, error } = await supabase.from("shopping_list").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Non hai i permessi per eliminare questo prodotto condiviso");
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping_list"] }),
+    onSuccess: (_, id) => {
+      qc.setQueryData<Item[]>(["shopping_list"], (old) => old?.filter((item) => item.id !== id) ?? []);
+      qc.invalidateQueries({ queryKey: ["shopping_list"] });
+    },
+    onError: (e: Error) => toast.error(toUserMessage(e)),
   });
 
   const updateItem = useMutation({
@@ -784,7 +789,6 @@ function ShoppingListPage() {
                 : null;
             const assignee =
               hasFamily && item.assigned_to ? family.getMember(item.assigned_to) : null;
-            const isMine = !item.user_id || (user && item.user_id === user.id);
             return (
               <ShoppingItemCard
                 key={item.id}
@@ -795,7 +799,7 @@ function ShoppingListPage() {
                 canAssignToMe={!!addedBy && (!assignee || assignee.user_id !== user?.id)}
                 onAssignToMe={() => assignToMe.mutate(item.id)}
                 onToggle={(v) => toggle.mutate({ id: item.id, value: v })}
-                onDelete={isMine ? () => remove.mutate(item.id) : undefined}
+                onDelete={() => remove.mutate(item.id)}
                 onUpdate={(quantity, unit) =>
                   updateItem.mutate({ id: item.id, quantity, unit })
                 }
@@ -1003,7 +1007,12 @@ function ShoppingItemCard({
     if (dx < 0) setOffset(Math.max(dx, -120));
   };
   const onTouchEnd = () => {
-    if (offset < -80 && onDelete) onDelete();
+    if (offset < -80 && onDelete) {
+      onDelete();
+      setOffset(-120);
+      startX.current = null;
+      return;
+    }
     setOffset(0);
     startX.current = null;
   };
@@ -1019,14 +1028,12 @@ function ShoppingItemCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
-      <div className="absolute inset-1 flex items-center justify-end pr-4 bg-destructive text-destructive-foreground rounded-lg">
+    <div className="relative overflow-hidden rounded-xl touch-pan-y">
+      <div className="absolute inset-1 flex items-center justify-end pr-5 bg-destructive text-destructive-foreground rounded-lg">
         <Trash2 className="h-4 w-4" />
       </div>
       <Card
-        className={`relative p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl ${
-          item.is_purchased ? "opacity-60" : ""
-        }`}
+        className="relative z-10 p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl bg-card"
         style={{ transform: `translateX(${offset}px)` }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -1153,12 +1160,12 @@ function ShoppingItemCard({
           )}
         </div>
         {!editing && (
-          <>
+          <div className="ml-2 flex shrink-0 items-center gap-2 self-stretch">
             {canAssignToMe && onAssignToMe && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9"
+                className="h-9 w-9 shrink-0"
                 onClick={onAssignToMe}
                 aria-label="Assegna a me"
                 title="Assegna a me"
@@ -1169,7 +1176,7 @@ function ShoppingItemCard({
             <Button
               size="icon"
               variant="ghost"
-              className="h-9 w-9"
+              className="h-9 w-9 shrink-0"
               onClick={() => setEditing(true)}
               aria-label="Modifica"
             >
@@ -1179,14 +1186,14 @@ function ShoppingItemCard({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9"
+                className="h-9 w-9 shrink-0"
                 onClick={onDelete}
                 aria-label="Elimina"
               >
                 <Trash2 className="h-4 w-4 text-muted-foreground" />
               </Button>
             )}
-          </>
+          </div>
         )}
       </Card>
     </div>
