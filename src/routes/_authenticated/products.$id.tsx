@@ -626,6 +626,17 @@ function PurchaseDialog({
               </Select>
             </div>
           </div>
+          <UnitPriceFields
+            price={price}
+            quantity={quantity}
+            unit={unit}
+            multiPack={multiPack}
+            setMultiPack={setMultiPack}
+            itemsPerPack={itemsPerPack}
+            setItemsPerPack={setItemsPerPack}
+            volumePerItem={volumePerItem}
+            setVolumePerItem={setVolumePerItem}
+          />
           <div>
             <Label className="text-xs">Note</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
