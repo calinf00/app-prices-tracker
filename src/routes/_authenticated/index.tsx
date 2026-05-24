@@ -205,7 +205,7 @@ function HomePage() {
       </Link>
 
       {/* Search */}
-      <section className="space-y-3">
+      <section className="space-y-3 pt-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
