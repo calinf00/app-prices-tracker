@@ -494,8 +494,8 @@ function ReceivedInvites({
   onDecline,
 }: {
   invites: (FamilyInvite & { families: { name: string } | null })[];
-  onAccept: (inv: FamilyInvite) => Promise<void>;
-  onDecline: (id: string) => Promise<void>;
+  onAccept: (inv: FamilyInvite) => Promise<unknown>;
+  onDecline: (id: string) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState<{ id: string; action: "accept" | "decline" } | null>(null);
 
