@@ -183,7 +183,7 @@ function HomePage() {
       {/* Greeting */}
       <section className="space-y-1">
         <h2 className="text-2xl font-bold tracking-tight">
-          Ciao {firstName} <span className="inline-block">👋</span>
+          Ciao {firstName}
         </h2>
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
       </section>

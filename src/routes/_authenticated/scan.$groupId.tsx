@@ -219,7 +219,7 @@ function ReceiptDetailPage() {
         {data.images.length === 0 ? (
           <Card className="p-6 text-center text-sm text-muted-foreground">
             <ImageOff className="h-6 w-6 mx-auto mb-2 opacity-60" />
-            📄 Nessuna immagine disponibile
+            Nessuna immagine disponibile
           </Card>
         ) : (
           <div className="grid grid-cols-3 gap-2">

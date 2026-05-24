@@ -13,6 +13,7 @@ import {
   Trash2,
   Plus,
   X,
+  Search,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -284,7 +285,7 @@ function ScanPage() {
     }
     if (!store.trim()) {
       setStoreError(true);
-      toast.error("⚠️ Inserisci il nome del negozio prima di salvare");
+      toast.error("Inserisci il nome del negozio prima di salvare");
       return;
     }
     setStoreError(false);
@@ -348,7 +349,7 @@ function ScanPage() {
           throw new Error(`Impossibile salvare l'acquisto "${cleanName}"`);
         }
       }
-      toast.success(`✅ ${selected.length} prodotti salvati con successo`);
+      toast.success(`${selected.length} prodotti salvati con successo`);
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       qc.invalidateQueries({ queryKey: ["known-stores"] });
@@ -673,7 +674,7 @@ function ScanPage() {
             onClick={() => cameraRef.current?.click()}
           >
             <Camera className="h-8 w-8" />
-            <span>📷 Scatta foto</span>
+            <span>Scatta foto</span>
           </Button>
           <Button
             size="lg"
@@ -682,7 +683,7 @@ function ScanPage() {
             onClick={() => galleryRef.current?.click()}
           >
             <ImageIcon className="h-8 w-8" />
-            <span>🖼️ Carica dalla galleria</span>
+            <span>Carica dalla galleria</span>
           </Button>
         </div>
       )}
@@ -766,7 +767,9 @@ function ScanPage() {
                   style={{ animationDelay: "0.3s" }}
                 />
               </div>
-              <p className="text-sm text-muted-foreground">Sto analizzando lo scontrino... 🔍</p>
+              <p className="text-sm text-muted-foreground inline-flex items-center gap-1.5 justify-center">
+                <Search className="h-4 w-4" /> Sto analizzando lo scontrino...
+              </p>
             </div>
           )}
 
