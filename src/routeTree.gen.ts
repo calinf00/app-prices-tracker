@@ -16,6 +16,7 @@ import { Route as AuthenticatedShoppingListRouteImport } from './routes/_authent
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedScanRouteImport } from './routes/_authenticated/scan'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedFamilyRouteImport } from './routes/_authenticated/family'
 import { Route as AuthenticatedAssistantRouteImport } from './routes/_authenticated/assistant'
 import { Route as AuthenticatedScanGroupIdRouteImport } from './routes/_authenticated/scan.$groupId'
@@ -58,6 +59,12 @@ const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedNotificationsRoute =
+  AuthenticatedNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedFamilyRoute = AuthenticatedFamilyRouteImport.update({
   id: '/family',
   path: '/family',
@@ -97,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/assistant': typeof AuthenticatedAssistantRoute
   '/family': typeof AuthenticatedFamilyRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
   '/scan': typeof AuthenticatedScanRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
@@ -110,6 +118,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/assistant': typeof AuthenticatedAssistantRoute
   '/family': typeof AuthenticatedFamilyRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
   '/scan': typeof AuthenticatedScanRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
@@ -126,6 +135,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/assistant': typeof AuthenticatedAssistantRoute
   '/_authenticated/family': typeof AuthenticatedFamilyRoute
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
   '/_authenticated/scan': typeof AuthenticatedScanRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/assistant'
     | '/family'
+    | '/notifications'
     | '/products'
     | '/scan'
     | '/settings'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/assistant'
     | '/family'
+    | '/notifications'
     | '/products'
     | '/scan'
     | '/settings'
@@ -171,6 +183,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/assistant'
     | '/_authenticated/family'
+    | '/_authenticated/notifications'
     | '/_authenticated/products'
     | '/_authenticated/scan'
     | '/_authenticated/settings'
@@ -236,6 +249,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/products'
       preLoaderRoute: typeof AuthenticatedProductsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/family': {
@@ -314,6 +334,7 @@ const AuthenticatedScanRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAssistantRoute: typeof AuthenticatedAssistantRoute
   AuthenticatedFamilyRoute: typeof AuthenticatedFamilyRoute
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
   AuthenticatedScanRoute: typeof AuthenticatedScanRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -324,6 +345,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAssistantRoute: AuthenticatedAssistantRoute,
   AuthenticatedFamilyRoute: AuthenticatedFamilyRoute,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
   AuthenticatedScanRoute: AuthenticatedScanRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
