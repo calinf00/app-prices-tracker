@@ -144,8 +144,8 @@ function ProductsPage() {
           size="icon"
           variant="outline"
           onClick={() => navigate({ to: "/products/duplicates" })}
-          aria-label="Gestisci duplicati"
-          title="Gestisci duplicati"
+          aria-label="Gestisci e unisci duplicati"
+          title="Gestisci e unisci duplicati"
         >
           <GitMerge className="h-4 w-4" />
         </Button>
