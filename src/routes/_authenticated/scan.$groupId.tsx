@@ -261,12 +261,15 @@ function ReceiptDetailPage() {
                     {p.products?.name ?? "—"}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {p.quantity ?? 1} {p.unit ?? "pz"} × €{Number(p.price).toFixed(2)}
+                    {p.quantity ?? 1} {p.unit ?? "pz"}
+                    {(p.quantity ?? 0) > 0
+                      ? ` · €${(Number(p.price) / (p.quantity || 1)).toFixed(2)}/${p.unit ?? "pz"}`
+                      : ""}
                   </div>
                 </Link>
                 <div className="flex items-center gap-1 shrink-0">
-                  <div className="font-semibold px-1">
-                    €{(Number(p.price) * (p.quantity ?? 1)).toFixed(2)}
+                  <div className="font-semibold px-1 tabular-nums">
+                    €{Number(p.price).toFixed(2)}
                   </div>
                   <Button
                     size="icon"
