@@ -93,10 +93,13 @@ function ReceiptDetailPage() {
     },
   });
 
+  // NOTE: purchases.price is the TOTAL price paid for the recorded
+  // (quantity, unit) — NOT a per-unit price. So the receipt total is the
+  // simple sum of `price`, with no multiplication by quantity.
   const total = useMemo(
     () =>
       (data?.purchases ?? []).reduce(
-        (s, p) => s + Number(p.price) * (p.quantity ?? 1),
+        (s, p) => s + Number(p.price),
         0,
       ),
     [data],
@@ -258,12 +261,15 @@ function ReceiptDetailPage() {
                     {p.products?.name ?? "—"}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {p.quantity ?? 1} {p.unit ?? "pz"} × €{Number(p.price).toFixed(2)}
+                    {p.quantity ?? 1} {p.unit ?? "pz"}
+                    {(p.quantity ?? 0) > 0
+                      ? ` · €${(Number(p.price) / (p.quantity || 1)).toFixed(2)}/${p.unit ?? "pz"}`
+                      : ""}
                   </div>
                 </Link>
                 <div className="flex items-center gap-1 shrink-0">
-                  <div className="font-semibold px-1">
-                    €{(Number(p.price) * (p.quantity ?? 1)).toFixed(2)}
+                  <div className="font-semibold px-1 tabular-nums">
+                    €{Number(p.price).toFixed(2)}
                   </div>
                   <Button
                     size="icon"
