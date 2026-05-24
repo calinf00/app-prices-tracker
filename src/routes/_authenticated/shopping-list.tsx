@@ -1024,7 +1024,7 @@ function ShoppingItemCard({
         <Trash2 className="h-4 w-4" />
       </div>
       <Card
-        className={`relative p-3 flex items-center gap-3 transition-transform min-h-[64px] ${
+        className={`relative p-3 flex items-center gap-3 transition-transform min-h-[64px] overflow-hidden rounded-xl ${
           item.is_purchased ? "opacity-60" : ""
         }`}
         style={{ transform: `translateX(${offset}px)` }}
