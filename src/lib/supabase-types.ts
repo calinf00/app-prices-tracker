@@ -23,3 +23,10 @@ export interface FamilyInvite {
   created_at: string;
   expires_at: string;
 }
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role: 'admin' | 'user'; // app_role enum
+  created_at: string;
+}
