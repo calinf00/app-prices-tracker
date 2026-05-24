@@ -135,7 +135,7 @@ function ProductsPage() {
   if (location.pathname !== "/products") return <Outlet />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5 pb-6">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -179,7 +179,7 @@ function ProductsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 pt-1">
         <Select value={cat} onValueChange={setCat}>
           <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
@@ -216,7 +216,7 @@ function ProductsPage() {
           {data?.length === 0 ? "Nessun prodotto. Aggiungine uno!" : "Nessun risultato."}
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4 pt-2">
           {filtered.map((p) => {
             const meta = categoryMeta(p.category);
             const Icon = meta.icon;
