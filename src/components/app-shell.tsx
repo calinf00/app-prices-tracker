@@ -1,9 +1,10 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Camera, Package, ShoppingCart, Users, Settings, X, Bot } from "lucide-react";
+import { Home, Camera, Package, ShoppingCart, Users, Settings, X, Bot, Bell, Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { useFamily } from "@/hooks/use-family";
 import { useInviteCount } from "@/hooks/use-invite-count";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { toUserMessage } from "@/lib/user-errors";
 
@@ -24,6 +25,7 @@ const titles: Record<string, string> = {
   "/assistant": "Assistente AI",
   "/settings": "Impostazioni",
   "/family": "Famiglia",
+  "/notifications": "Notifiche",
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -35,9 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const inviteCount = useInviteCount();
   const family = useFamily();
-  const pendingInvite = family.myInvites?.[0] as
-    | (typeof family.myInvites)[number]
-    | undefined;
+  const invites = family.myInvites ?? [];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -45,17 +45,87 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex w-full max-w-[640px] items-center justify-between px-4 h-14">
           <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           <div className="flex items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors relative"
+                  aria-label="Notifiche"
+                >
+                  <Bell className="h-5 w-5" />
+                  {inviteCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-background">
+                      {inviteCount > 9 ? "9+" : inviteCount}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0">
+                <div className="flex items-center justify-between px-4 py-2 border-b">
+                  <div className="font-medium text-sm">Notifiche</div>
+                  <Link
+                    to="/notifications"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Vedi tutte
+                  </Link>
+                </div>
+                {invites.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    Nessuna notifica
+                  </div>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto divide-y">
+                    {invites.slice(0, 5).map((inv) => (
+                      <div key={inv.id} className="p-3">
+                        <div className="flex items-start gap-2">
+                          <Users className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm truncate">
+                              Invito a "{inv.families?.name ?? "una famiglia"}"
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <Button
+                                size="sm"
+                                className="h-7 px-2"
+                                onClick={() =>
+                                  family
+                                    .acceptInvite(inv)
+                                    .then(() => toast.success("Invito accettato"))
+                                    .catch((e) => toast.error(toUserMessage(e as Error)))
+                                }
+                              >
+                                <Check className="h-3.5 w-3.5 mr-1" />
+                                Accetta
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() =>
+                                  family
+                                    .declineInvite(inv.id)
+                                    .then(() => toast.success("Invito rifiutato"))
+                                    .catch((e) => toast.error(toUserMessage(e as Error)))
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
             <Link
               to="/family"
               className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors relative"
               aria-label="Famiglia"
             >
               <Users className="h-5 w-5" />
-              {inviteCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-background">
-                  {inviteCount > 9 ? "9+" : inviteCount}
-                </span>
-              )}
             </Link>
             <Link
               to="/settings"
@@ -66,39 +136,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           </div>
         </div>
-        {pendingInvite && (
-          <div className="mx-auto w-full max-w-[640px] px-4 pb-2">
-            <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-              <Users className="h-4 w-4 text-primary shrink-0" />
-              <div className="flex-1 min-w-0 truncate">
-                Invito a unirti a "{pendingInvite.families?.name ?? "una famiglia"}"
-              </div>
-              <Button
-                size="sm"
-                onClick={() =>
-                  family
-                    .acceptInvite(pendingInvite)
-                    .then(() => toast.success("Invito accettato"))
-                    .catch((e) => toast.error(toUserMessage(e as Error)))
-                }
-              >
-                Accetta
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  family
-                    .declineInvite(pendingInvite.id)
-                    .then(() => toast.success("Invito rifiutato"))
-                    .catch((e) => toast.error(toUserMessage(e as Error)))
-                }
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
       </header>
 
       <main
