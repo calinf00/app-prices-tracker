@@ -221,10 +221,17 @@ export function useFamily() {
   const inviteByEmail = useMutation({
     mutationFn: async (email: string) => {
       if (!user || !data.family) throw new Error("Nessuna famiglia");
+      const normalized = email.trim().toLowerCase();
+      // Rimuovi eventuali inviti precedenti (revocati/scaduti) per evitare unique conflict
+      await supabase
+        .from("family_invites")
+        .delete()
+        .eq("family_id", data.family.id)
+        .eq("email", normalized);
       const { error } = await supabase.from("family_invites").insert({
         family_id: data.family.id,
         invited_by: user.id,
-        email: email.trim().toLowerCase(),
+        email: normalized,
         status: "pending",
       });
       if (error) throw error;
@@ -236,7 +243,7 @@ export function useFamily() {
     mutationFn: async (inviteId: string) => {
       const { error } = await supabase
         .from("family_invites")
-        .update({ status: "revoked" })
+        .delete()
         .eq("id", inviteId);
       if (error) throw error;
     },
