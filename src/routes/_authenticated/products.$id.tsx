@@ -88,7 +88,7 @@ function ProductDetailPage() {
         .select("id, name, brand, category, image_url")
         .eq("id", id)
         .single();
-      let purchasesRes = await supabase
+      let purchasesRes: any = await supabase
         .from("purchases")
         .select("id, store_name, price, quantity, unit, purchase_date, notes, price_per_base_unit, base_unit")
         .eq("product_id", id)
