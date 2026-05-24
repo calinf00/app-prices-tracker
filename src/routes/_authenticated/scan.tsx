@@ -35,6 +35,8 @@ import { CATEGORIES, UNITS } from "@/lib/categories";
 import { compressImage, cropImageToFile } from "@/lib/image-compress";
 import { encodeReceiptKey } from "@/lib/receipt-key";
 import { lazy, Suspense } from "react";
+import { ProductDedupModal, type DedupPair } from "@/components/product-dedup-modal";
+import { findSimilarProductsFn } from "@/lib/product-similarity.functions";
 const ReceiptCrop = lazy(() =>
   import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
 );
@@ -98,7 +100,11 @@ function ScanPage() {
   const [storeError, setStoreError] = useState(false);
 
   const scan = useServerFn(scanReceiptUpload);
+  const findSimilar = useServerFn(findSimilarProductsFn);
   const qc = useQueryClient();
+
+  const [dedupPairs, setDedupPairs] = useState<DedupPair[]>([]);
+  const [dedupOpen, setDedupOpen] = useState(false);
 
   // Recent scans (history)
   const recent = useQuery({
