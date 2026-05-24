@@ -65,23 +65,23 @@ export function ReceiptCrop({ src, onCancel, onConfirm }: Props) {
         <p className="text-center text-xs text-white/70">
           Ritaglia per includere solo lo scontrino
         </p>
-        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
           <Button
             variant="outline"
-            className="flex-1 min-w-[120px] h-[52px] text-base bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white"
+            className="w-full h-auto min-h-[44px] py-2 text-base bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white whitespace-normal break-words text-center leading-tight"
             onClick={onCancel}
           >
             <RefreshCw className="h-4 w-4 mr-2" /> Rifare foto
           </Button>
           <Button
             variant="outline"
-            className="flex-1 min-w-[120px] h-[52px] text-base bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white"
+            className="w-full h-auto min-h-[44px] py-2 text-base bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white whitespace-normal break-words text-center leading-tight"
             onClick={() => imgRef.current && onConfirm(null, imgRef.current)}
           >
             <SkipForward className="h-4 w-4 mr-2" /> Salta ritaglio
           </Button>
           <Button
-            className="flex-1 min-w-[140px] h-[52px] text-base bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="w-full h-auto min-h-[44px] py-2 text-base bg-emerald-600 hover:bg-emerald-700 text-white whitespace-normal break-words text-center leading-tight"
             disabled={!completed || completed.width < 10 || completed.height < 10}
             onClick={() =>
               imgRef.current && onConfirm(completed, imgRef.current)
