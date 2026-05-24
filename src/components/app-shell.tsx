@@ -155,7 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={to}
                 to={to as "/"}
-                className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium transition-transform duration-100 active:scale-95 ${
+                className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium transition-all duration-150 active:scale-95 ${
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
