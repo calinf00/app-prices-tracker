@@ -37,6 +37,8 @@ import { encodeReceiptKey } from "@/lib/receipt-key";
 import { lazy, Suspense } from "react";
 import { ProductDedupModal, type DedupPair } from "@/components/product-dedup-modal";
 import { findSimilarProductsFn } from "@/lib/product-similarity.functions";
+import { useFamily } from "@/hooks/use-family";
+import { Switch } from "@/components/ui/switch";
 const ReceiptCrop = lazy(() =>
   import("@/components/receipt-crop").then((m) => ({ default: m.ReceiptCrop })),
 );
@@ -80,6 +82,10 @@ function ScanPage() {
   const location = useLocation();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const family = useFamily();
+  const hasFamily = !!family.family;
+  const familySize = family.members.length;
+  const [shareWithFamily, setShareWithFamily] = useState(true);
 
   const [step, setStep] = useState<Step>("capture");
   const [images, setImages] = useState<CapturedImage[]>([]);
@@ -321,7 +327,7 @@ function ScanPage() {
           console.log("[scan.save] creating product", cleanName);
           const { data: created, error: pErr } = await supabase
             .from("products")
-            .insert({ name: cleanName, category: item.category })
+            .insert({ name: cleanName, category: item.category, user_id: uid })
             .select("id")
             .single();
           if (pErr) {
@@ -353,6 +359,7 @@ function ScanPage() {
           unit: item.unit,
           purchase_date: effectiveDate,
           notes: "Importato da scontrino",
+          user_id: uid,
         };
         console.log("[scan.save] inserting purchase", purchasePayload);
         const { error: puErr } = await supabase.from("purchases").insert(purchasePayload);
@@ -361,7 +368,13 @@ function ScanPage() {
           throw new Error(`Impossibile salvare l'acquisto "${cleanName}"`);
         }
       }
-      toast.success(`${selected.length} prodotti salvati con successo`);
+      if (hasFamily && shareWithFamily && familySize > 1) {
+        toast.success(
+          `${selected.length} prodotti salvati — visibili a ${familySize} membri della famiglia`,
+        );
+      } else {
+        toast.success(`${selected.length} prodotti salvati con successo`);
+      }
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       qc.invalidateQueries({ queryKey: ["known-stores"] });
@@ -668,6 +681,17 @@ function ScanPage() {
 
         {/* Footer */}
         <div className="fixed bottom-16 left-0 right-0 border-t bg-background px-4 py-3 space-y-2 z-50 shadow-lg">
+          {hasFamily && familySize > 1 && (
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div className="min-w-0">
+                <Label className="text-xs">Condividi con la famiglia</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Visibile a {familySize} membri
+                </p>
+              </div>
+              <Switch checked={shareWithFamily} onCheckedChange={setShareWithFamily} />
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {selectedCount} di {items.length} selezionati

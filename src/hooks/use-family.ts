@@ -91,6 +91,11 @@ export function useFamily() {
   const isOwner = !!(data.family && user && data.family.created_by === user.id);
   const memberIds = data.members.map((m) => m.user_id);
 
+  const getMember = (userId: string | null | undefined) => {
+    if (!userId) return null;
+    return data.members.find((m) => m.user_id === userId) ?? null;
+  };
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ["family"] });
 
   const createFamily = useMutation({
@@ -252,6 +257,7 @@ export function useFamily() {
     myInvites: data.myInvites,
     memberIds,
     isOwner,
+    getMember,
     isLoading: query.isLoading,
     createFamily: (name: string) => createFamily.mutateAsync(name),
     joinByCode: (code: string) => joinByCode.mutateAsync(code),

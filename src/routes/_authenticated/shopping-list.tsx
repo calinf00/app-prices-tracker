@@ -14,6 +14,7 @@ import {
   Check,
   X,
   Loader2,
+  UserPlus,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { UNITS } from "@/lib/categories";
 import { estimatePrice, smartShoppingList } from "@/lib/openai.functions";
 import { convertToBaseUnit, baseUnitOf, isSubUnit, calcUnitPrices, estimateCost } from "@/lib/unit-conversion";
+import { useFamily } from "@/hooks/use-family";
+import { useAuth } from "@/hooks/use-auth";
+import { FamilyAvatar } from "@/components/family-avatar";
 
 export const Route = createFileRoute("/_authenticated/shopping-list")({
   component: ShoppingListPage,
@@ -61,6 +65,8 @@ type Item = {
   unit: string | null;
   is_purchased: boolean;
   created_at?: string;
+  user_id?: string | null;
+  assigned_to?: string | null;
 };
 
 type PriceRange = {
@@ -114,6 +120,10 @@ function ShoppingListPage() {
   const qc = useQueryClient();
   const estimatePriceFn = useServerFn(estimatePrice);
   const smartListFn = useServerFn(smartShoppingList);
+  const { user } = useAuth();
+  const family = useFamily();
+  const hasFamily = !!family.family;
+  const [scope, setScope] = useState<"mine" | "family">("family");
 
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
@@ -146,13 +156,36 @@ function ShoppingListPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shopping_list")
-        .select("id, product_name, quantity, unit, is_purchased, created_at")
+        .select("id, product_name, quantity, unit, is_purchased, created_at, user_id, assigned_to")
         .order("is_purchased", { ascending: true })
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Item[];
     },
   });
+
+  // Realtime sync for family-shared list
+  useEffect(() => {
+    const channel = supabase
+      .channel("family-shopping-list-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shopping_list" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["shopping_list"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
+  const visibleItems = useMemo(() => {
+    if (!items) return [] as Item[];
+    if (!hasFamily || scope === "family") return items;
+    return items.filter((i) => !i.user_id || (user && i.user_id === user.id));
+  }, [items, scope, hasFamily, user]);
 
   // Full product catalog with min/max prices for ranges + suggestions
   const { data: productStats } = useQuery({
@@ -258,6 +291,7 @@ function ShoppingListPage() {
         quantity: payload.quantity,
         unit: payload.unit,
         is_purchased: false,
+        user_id: user?.id ?? null,
       });
       if (error) throw error;
       pushRecent(payload.product_name);
@@ -269,6 +303,22 @@ function ShoppingListPage() {
       setSuggestOpen(false);
       setActiveIdx(-1);
       setRecents(loadJSON<string[]>(RECENTS_KEY, []));
+      qc.invalidateQueries({ queryKey: ["shopping_list"] });
+    },
+    onError: (e: Error) => toast.error(toUserMessage(e)),
+  });
+
+  const assignToMe = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("Non autenticato");
+      const { error } = await supabase
+        .from("shopping_list")
+        .update({ assigned_to: user.id })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Assegnato a te");
       qc.invalidateQueries({ queryKey: ["shopping_list"] });
     },
     onError: (e: Error) => toast.error(toUserMessage(e)),
@@ -406,15 +456,19 @@ function ShoppingListPage() {
     });
   }, [items, productStats, statsByName, aiCache, estimatePriceFn]);
 
-  // Totals
-  const total = items?.length ?? 0;
-  const done = items?.filter((i) => i.is_purchased).length ?? 0;
+  // Totals (over the visible scope)
+  const total = visibleItems.length;
+  const done = visibleItems.filter((i) => i.is_purchased).length;
+  const todo = total - done;
+  const assignedToMe = visibleItems.filter(
+    (i) => !i.is_purchased && user && i.assigned_to === user.id,
+  ).length;
   const progress = total === 0 ? 0 : (done / total) * 100;
 
   const { totalMin, totalMax } = useMemo(() => {
     let min = 0;
     let max = 0;
-    (items ?? [])
+    visibleItems
       .filter((i) => !i.is_purchased)
       .forEach((i) => {
         const r = getRange(i.product_name);
@@ -424,7 +478,7 @@ function ShoppingListPage() {
         max += estimateCost(r.max, rawQty, i.unit ?? "pz");
       });
     return { totalMin: min, totalMax: max };
-  }, [items, statsByName, aiCache]);
+  }, [visibleItems, statsByName, aiCache]);
 
   // Templates
   const saveAsTemplate = () => {
@@ -450,6 +504,7 @@ function ShoppingListPage() {
         quantity: it.quantity,
         unit: it.unit,
         is_purchased: false,
+        user_id: user?.id ?? null,
       }));
       const { error } = await supabase.from("shopping_list").insert(rows);
       if (error) throw error;
@@ -498,6 +553,7 @@ function ShoppingListPage() {
             quantity: 1,
             unit: "pz",
             is_purchased: false,
+            user_id: user?.id ?? null,
           })),
         );
       if (error) throw error;
@@ -536,7 +592,8 @@ function ShoppingListPage() {
           <div className="min-w-0">
             <h1 className="text-lg font-semibold truncate">Lista della Spesa</h1>
             <p className="text-xs text-muted-foreground">
-              {done} di {total} acquistati
+              {total} articoli · {done} acquistati · {todo} da fare
+              {hasFamily && assignedToMe > 0 && ` · ${assignedToMe} assegnati a te`}
             </p>
           </div>
           <DropdownMenu>
@@ -578,6 +635,24 @@ function ShoppingListPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        {hasFamily && (
+          <div className="inline-flex rounded-md border border-border p-0.5 bg-muted/30 w-fit">
+            <button
+              type="button"
+              onClick={() => setScope("mine")}
+              className={`px-3 py-1 text-xs rounded ${scope === "mine" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              Solo i miei
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope("family")}
+              className={`px-3 py-1 text-xs rounded ${scope === "family" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              Tutta la famiglia
+            </button>
+          </div>
+        )}
         <Progress
           value={progress}
           className="h-2 [&>div]:bg-emerald-500 bg-emerald-500/15"
@@ -694,24 +769,39 @@ function ShoppingListPage() {
       {/* List */}
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Caricamento...</p>
-      ) : (items?.length ?? 0) === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted-foreground">
-          La lista è vuota. Aggiungi il primo prodotto!
+          {hasFamily && scope === "mine"
+            ? "Non hai articoli tuoi. Passa a 'Tutta la famiglia' per vedere il resto."
+            : "La lista è vuota. Aggiungi il primo prodotto!"}
         </Card>
       ) : (
         <div className="space-y-2">
-          {items!.map((item) => (
-            <ShoppingItemCard
-              key={item.id}
-              item={item}
-              range={getRange(item.product_name)}
-              onToggle={(v) => toggle.mutate({ id: item.id, value: v })}
-              onDelete={() => remove.mutate(item.id)}
-              onUpdate={(quantity, unit) =>
-                updateItem.mutate({ id: item.id, quantity, unit })
-              }
-            />
-          ))}
+          {visibleItems.map((item) => {
+            const addedBy =
+              hasFamily && item.user_id && item.user_id !== user?.id
+                ? family.getMember(item.user_id)
+                : null;
+            const assignee =
+              hasFamily && item.assigned_to ? family.getMember(item.assigned_to) : null;
+            const isMine = !item.user_id || (user && item.user_id === user.id);
+            return (
+              <ShoppingItemCard
+                key={item.id}
+                item={item}
+                range={getRange(item.product_name)}
+                addedBy={addedBy}
+                assignee={assignee}
+                canAssignToMe={!!addedBy && (!assignee || assignee.user_id !== user?.id)}
+                onAssignToMe={() => assignToMe.mutate(item.id)}
+                onToggle={(v) => toggle.mutate({ id: item.id, value: v })}
+                onDelete={isMine ? () => remove.mutate(item.id) : undefined}
+                onUpdate={(quantity, unit) =>
+                  updateItem.mutate({ id: item.id, quantity, unit })
+                }
+              />
+            );
+          })}
         </div>
       )}
 
@@ -883,12 +973,20 @@ function ShoppingItemCard({
   onToggle,
   onDelete,
   onUpdate,
+  addedBy,
+  assignee,
+  canAssignToMe,
+  onAssignToMe,
 }: {
   item: Item;
   range: PriceRange | null;
   onToggle: (v: boolean) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onUpdate: (quantity: number, unit: string) => void;
+  addedBy?: { user_id: string; display_name: string; email: string } | null;
+  assignee?: { user_id: string; display_name: string; email: string } | null;
+  canAssignToMe?: boolean;
+  onAssignToMe?: () => void;
 }) {
   const startX = useRef<number | null>(null);
   const [offset, setOffset] = useState(0);
@@ -905,7 +1003,7 @@ function ShoppingItemCard({
     if (dx < 0) setOffset(Math.max(dx, -120));
   };
   const onTouchEnd = () => {
-    if (offset < -80) onDelete();
+    if (offset < -80 && onDelete) onDelete();
     setOffset(0);
     startX.current = null;
   };
@@ -947,6 +1045,28 @@ function ShoppingItemCard({
           >
             {item.product_name}
           </div>
+          {(addedBy || assignee) && (
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              {addedBy && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <FamilyAvatar
+                    name={addedBy.display_name || addedBy.email}
+                    userId={addedBy.user_id}
+                    size="xs"
+                  />
+                  <span className="truncate max-w-[100px]">
+                    {addedBy.display_name || addedBy.email}
+                  </span>
+                </span>
+              )}
+              {assignee && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px]">
+                  <UserPlus className="h-2.5 w-2.5" />
+                  {assignee.display_name || assignee.email}
+                </span>
+              )}
+            </div>
+          )}
           {editing ? (
             <div className="flex items-center gap-1 mt-1">
               <Input
@@ -1034,6 +1154,18 @@ function ShoppingItemCard({
         </div>
         {!editing && (
           <>
+            {canAssignToMe && onAssignToMe && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                onClick={onAssignToMe}
+                aria-label="Assegna a me"
+                title="Assegna a me"
+              >
+                <UserPlus className="h-4 w-4 text-primary" />
+              </Button>
+            )}
             <Button
               size="icon"
               variant="ghost"
@@ -1043,15 +1175,17 @@ function ShoppingItemCard({
             >
               <Pencil className="h-4 w-4 text-muted-foreground" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={onDelete}
-              aria-label="Elimina"
-            >
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-            </Button>
+            {onDelete && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9"
+                onClick={onDelete}
+                aria-label="Elimina"
+              >
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
           </>
         )}
       </Card>

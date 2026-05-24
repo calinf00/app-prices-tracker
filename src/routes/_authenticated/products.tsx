@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta } from "@/lib/categories";
+import { useFamily } from "@/hooks/use-family";
+import { useAuth } from "@/hooks/use-auth";
+import { FamilyAvatar } from "@/components/family-avatar";
 
 export const Route = createFileRoute("/_authenticated/products")({
   component: ProductsPage,
@@ -25,6 +28,7 @@ type Row = {
   brand: string | null;
   category: string | null;
   image_url: string | null;
+  user_id: string | null;
   purchases: { price: number; purchase_date: string; store_name: string | null }[];
 };
 
@@ -33,6 +37,10 @@ type SortKey = "name" | "recent" | "price-asc" | "price-desc";
 function ProductsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const family = useFamily();
+  const hasFamily = !!family.family;
+  const [scope, setScope] = useState<"mine" | "family">("family");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const [store, setStore] = useState<string>("all");
@@ -44,7 +52,7 @@ function ProductsPage() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, name, brand, category, image_url, merged_into, purchases(price, purchase_date, store_name)",
+          "id, name, brand, category, image_url, user_id, merged_into, purchases(price, purchase_date, store_name)",
         )
         .limit(500);
       if (error) {
@@ -52,7 +60,7 @@ function ProductsPage() {
         const { data: d2, error: e2 } = await supabase
           .from("products")
           .select(
-            "id, name, brand, category, image_url, purchases(price, purchase_date, store_name)",
+            "id, name, brand, category, image_url, user_id, purchases(price, purchase_date, store_name)",
           )
           .limit(500);
         if (e2) throw e2;
@@ -80,6 +88,7 @@ function ProductsPage() {
     const t = q.trim().toLowerCase();
     const rows = (data ?? [])
       .filter((p) => {
+        if (hasFamily && scope === "mine" && user && p.user_id && p.user_id !== user.id) return false;
         if (cat !== "all" && p.category !== cat) return false;
         if (
           store !== "all" &&
@@ -121,7 +130,7 @@ function ProductsPage() {
         break;
     }
     return rows;
-  }, [data, q, cat, store, sort]);
+  }, [data, q, cat, store, sort, scope, hasFamily, user]);
 
   if (location.pathname !== "/products") return <Outlet />;
 
@@ -150,6 +159,25 @@ function ProductsPage() {
           <GitMerge className="h-4 w-4" />
         </Button>
       </div>
+
+      {hasFamily && (
+        <div className="inline-flex rounded-md border border-border p-0.5 bg-muted/30 w-fit">
+          <button
+            type="button"
+            onClick={() => setScope("mine")}
+            className={`px-3 py-1 text-xs rounded ${scope === "mine" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+          >
+            I miei
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("family")}
+            className={`px-3 py-1 text-xs rounded ${scope === "family" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+          >
+            Famiglia
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <Select value={cat} onValueChange={setCat}>
@@ -192,9 +220,11 @@ function ProductsPage() {
           {filtered.map((p) => {
             const meta = categoryMeta(p.category);
             const Icon = meta.icon;
+            const isOther = hasFamily && p.user_id && user && p.user_id !== user.id;
+            const owner = isOther ? family.getMember(p.user_id) : null;
             return (
               <Link key={p.id} to="/products/$id" params={{ id: p.id }}>
-                <Card className="p-3 flex items-center gap-3 hover:border-primary/40 transition-colors">
+                <Card className="relative p-3 flex items-center gap-3 hover:border-primary/40 transition-colors">
                   <div className={`h-12 w-12 rounded-lg overflow-hidden grid place-items-center shrink-0 ${meta.className}`}>
                     {p.image_url ? (
                       <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
@@ -213,6 +243,15 @@ function ProductsPage() {
                       <div className="font-semibold">€{p.lastPrice.toFixed(2)}</div>
                       <div className="text-[10px] text-muted-foreground">ultimo</div>
                     </div>
+                  )}
+                  {owner && (
+                    <FamilyAvatar
+                      name={owner.display_name || owner.email}
+                      userId={owner.user_id}
+                      size="xs"
+                      className="absolute top-1.5 right-1.5 ring-2 ring-background"
+                      title={`Aggiunto da ${owner.display_name || owner.email}`}
+                    />
                   )}
                 </Card>
               </Link>
