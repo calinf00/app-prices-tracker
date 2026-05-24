@@ -520,6 +520,9 @@ function PurchaseDialog({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [multiPack, setMultiPack] = useState(false);
+  const [itemsPerPack, setItemsPerPack] = useState<string>("");
+  const [volumePerItem, setVolumePerItem] = useState<string>("");
 
   // Sync when dialog opens
   useEffect(() => {
@@ -530,6 +533,9 @@ function PurchaseDialog({
       setUnit(purchase?.unit ?? "pz");
       setDate(purchase?.purchase_date ?? new Date().toISOString().slice(0, 10));
       setNotes(purchase?.notes ?? "");
+      setMultiPack(false);
+      setItemsPerPack("");
+      setVolumePerItem("");
     }
   }, [open, purchase]);
 
@@ -540,22 +546,39 @@ function PurchaseDialog({
     }
     setSaving(true);
     try {
+      const qty = Number(quantity) || 1;
+      const ipp = multiPack ? Math.max(1, Number(itemsPerPack) || 1) : 1;
+      const vpi = multiPack ? Number(volumePerItem) || 0 : 0;
+      const calc = calcUnitPrices(Number(price), qty, unit, ipp, vpi);
       const payload = {
         product_id: productId,
         store_name: store.trim() || null,
         price: Number(price),
-        quantity: Number(quantity) || 1,
+        quantity: qty,
         unit,
         purchase_date: date,
         notes: notes.trim() || null,
       };
-      if (isEdit && purchase) {
-        const { error } = await supabase.from("purchases").update(payload).eq("id", purchase.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("purchases").insert(payload);
-        if (error) throw error;
+      const withUnitPrice = {
+        ...payload,
+        price_per_base_unit: Number(calc.pricePerBaseUnit.toFixed(4)),
+        base_unit: calc.baseUnitLabel.replace("€/", ""),
+      };
+      const exec = async (body: any) =>
+        isEdit && purchase
+          ? supabase.from("purchases").update(body).eq("id", purchase.id)
+          : supabase.from("purchases").insert(body);
+      let { error } = await exec(withUnitPrice);
+      if (error && /column|schema cache/i.test(error.message ?? "")) {
+        const retry = await exec(payload);
+        error = retry.error;
+        if (!error) {
+          toast.warning(
+            "Colonne prezzo unitario non ancora disponibili — applica la migration Supabase",
+          );
+        }
       }
+      if (error) throw error;
       toast.success(isEdit ? "Acquisto aggiornato" : "Acquisto aggiunto");
       onSaved();
     } catch (e: any) {
