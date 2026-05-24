@@ -30,8 +30,10 @@ import {
   Mail,
   LogOut,
   Loader2,
+  Bell,
 } from "lucide-react";
 import { toUserMessage } from "@/lib/user-errors";
+import type { FamilyInvite } from "@/lib/supabase-types";
 
 export const Route = createFileRoute("/_authenticated/family")({
   component: FamilyPage,
