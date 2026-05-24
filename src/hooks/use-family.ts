@@ -250,21 +250,31 @@ export function useFamily() {
       const nowIso = new Date().toISOString();
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Riusa eventuali inviti precedenti invece di cancellarli: lo schema mantiene lo storico
+      // Riusa un eventuale invito precedente invece di cancellarlo: lo schema mantiene lo storico
       // e il vincolo unico su family_id/email altrimenti blocca i nuovi inviti.
-      const { data: refreshedInvite, error: refreshErr } = await supabase
+      const { data: existingInviteRows, error: existingInviteErr } = await supabase
         .from("family_invites")
-        .update({
-          invited_by: user.id,
-          status: "pending",
-          created_at: nowIso,
-          expires_at: expiresAt,
-        })
+        .select("id")
         .eq("family_id", data.family.id)
         .eq("email", normalized)
-        .select("id");
-      if (refreshErr) throw refreshErr;
-      if (refreshedInvite && refreshedInvite.length > 0) return;
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (existingInviteErr) throw existingInviteErr;
+
+      const existingInviteId = existingInviteRows?.[0]?.id;
+      if (existingInviteId) {
+        const { error: refreshErr } = await supabase
+          .from("family_invites")
+          .update({
+            invited_by: user.id,
+            status: "pending",
+            created_at: nowIso,
+            expires_at: expiresAt,
+          })
+          .eq("id", existingInviteId);
+        if (refreshErr) throw refreshErr;
+        return;
+      }
 
       const { error } = await supabase.from("family_invites").insert({
         family_id: data.family.id,
