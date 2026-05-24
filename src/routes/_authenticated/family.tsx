@@ -66,8 +66,21 @@ function FamilyPage() {
       {f.myInvites.length > 0 && (
         <ReceivedInvites
           invites={f.myInvites}
-          onAccept={(inv) => f.acceptInvite(inv).then(() => toast.success("Invito accettato")).catch((e) => toast.error(toUserMessage(e)))}
-          onDecline={(id) => f.declineInvite(id).then(() => toast.success("Invito rifiutato")).catch((e) => toast.error(toUserMessage(e)))}
+          onAccept={(inv) =>
+            f
+              .acceptInvite(inv)
+              .then(() => {
+                toast.success("Sei entrato nella famiglia!");
+                window.location.reload();
+              })
+              .catch((e) => toast.error(toUserMessage(e)))
+          }
+          onDecline={(id) =>
+            f
+              .declineInvite(id)
+              .then(() => toast.success("Invito rifiutato"))
+              .catch((e) => toast.error(toUserMessage(e)))
+          }
         />
       )}
 
