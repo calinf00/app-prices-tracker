@@ -157,18 +157,18 @@ function ShoppingListPage() {
   const { data: productStats } = useQuery({
     queryKey: ["product-stats"],
     queryFn: async () => {
-      let { data } = await supabase
+      let { data } = (await supabase
         .from("products")
         .select(
           "id, name, brand, purchases(price, quantity, unit, price_per_base_unit, base_unit, purchase_date)",
         )
-        .limit(1000);
+        .limit(1000)) as { data: any[] | null };
       if (!data) {
         const fallback = await supabase
           .from("products")
           .select("id, name, brand, purchases(price, quantity, unit, purchase_date)")
           .limit(1000);
-        data = fallback.data;
+        data = (fallback.data as any[]) ?? null;
       }
       const stats = ((data ?? []) as any[]).map<ProductStat>((p) => {
         const purchases = (p.purchases ?? []) as any[];
