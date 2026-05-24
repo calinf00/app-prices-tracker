@@ -48,7 +48,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { UNITS } from "@/lib/categories";
 import { estimatePrice, smartShoppingList } from "@/lib/openai.functions";
-import { convertToBaseUnit, baseUnitOf, isSubUnit } from "@/lib/unit-conversion";
+import { convertToBaseUnit, baseUnitOf, isSubUnit, calcUnitPrices, estimateCost } from "@/lib/unit-conversion";
 
 export const Route = createFileRoute("/_authenticated/shopping-list")({
   component: ShoppingListPage,
@@ -157,21 +157,49 @@ function ShoppingListPage() {
   const { data: productStats } = useQuery({
     queryKey: ["product-stats"],
     queryFn: async () => {
-      const { data } = await supabase
+      let { data } = await supabase
         .from("products")
-        .select("id, name, brand, purchases(price)")
+        .select(
+          "id, name, brand, purchases(price, quantity, unit, price_per_base_unit, base_unit, purchase_date)",
+        )
         .limit(1000);
+      if (!data) {
+        const fallback = await supabase
+          .from("products")
+          .select("id, name, brand, purchases(price, quantity, unit, purchase_date)")
+          .limit(1000);
+        data = fallback.data;
+      }
       const stats = ((data ?? []) as any[]).map<ProductStat>((p) => {
-        const prices = (p.purchases ?? [])
-          .map((x: any) => Number(x.price))
-          .filter((n: number) => Number.isFinite(n) && n > 0);
+        const purchases = (p.purchases ?? []) as any[];
+        const unitPrices = purchases
+          .map((x) => {
+            const price = Number(x.price);
+            if (!Number.isFinite(price) || price <= 0) return null;
+            const qty = Number(x.quantity) || 1;
+            const stored = x.price_per_base_unit != null ? Number(x.price_per_base_unit) : null;
+            const calc = stored
+              ? { pricePerBaseUnit: stored, baseUnitLabel: `€/${x.base_unit ?? "pz"}` }
+              : calcUnitPrices(price, qty, x.unit ?? "pz");
+            return {
+              pricePerBaseUnit: calc.pricePerBaseUnit,
+              baseUnit: (x.base_unit ?? calc.baseUnitLabel.replace("€/", "")) as string,
+              date: x.purchase_date as string,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+        const sorted = [...unitPrices].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
+        const last = sorted[0] ?? null;
         return {
           id: p.id,
           name: p.name,
           brand: p.brand,
-          minPrice: prices.length ? Math.min(...prices) : null,
-          maxPrice: prices.length ? Math.max(...prices) : null,
-          count: prices.length,
+          minPrice: unitPrices.length ? Math.min(...unitPrices.map((x) => x.pricePerBaseUnit)) : null,
+          maxPrice: unitPrices.length ? Math.max(...unitPrices.map((x) => x.pricePerBaseUnit)) : null,
+          count: unitPrices.length,
+          priceUnit: last?.baseUnit ?? null,
         };
       });
       return stats;
