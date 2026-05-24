@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
+// Active tables: products, purchases, shopping_list, families, family_members, family_invites, ai_rate_limits
+// Legacy tables (disabled via RLS): prodotti, prezzi, categorie, fornitori, storico_prezzi
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
