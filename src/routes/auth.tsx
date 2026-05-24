@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useState, type FormEvent } from "react";
-import { ShoppingBasket } from "lucide-react";
+import { ShoppingBasket, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (!loading && session) return <Navigate to="/" />;
 
@@ -45,12 +46,24 @@ function AuthPage() {
     else toast.success("Controlla la tua email per confermare la registrazione");
   };
 
+  const handleReset = async () => {
+    if (!email.trim()) {
+      toast.error("Inserisci la tua email per ricevere il reset");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) toast.error(toUserMessage(error));
+    else toast.success("Ti abbiamo inviato un'email per reimpostare la password");
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center gap-3 mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-primary text-primary-foreground grid place-items-center shadow-lg shadow-primary/20">
-            <ShoppingBasket className="h-7 w-7" />
+          <div className="h-16 w-16 rounded-2xl bg-primary text-primary-foreground grid place-items-center shadow-xl shadow-primary/25">
+            <ShoppingBasket className="h-8 w-8" />
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight">App Prezzi</h1>
@@ -60,29 +73,52 @@ function AuthPage() {
           </div>
         </div>
 
-        <Card className="p-6">
+        <Card className="p-6 shadow-lg border-border/50">
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="login">Accedi</TabsTrigger>
-              <TabsTrigger value="signup">Registrati</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-4 h-11">
+              <TabsTrigger value="login" className="h-9 text-sm font-medium">Accedi</TabsTrigger>
+              <TabsTrigger value="signup" className="h-9 text-sm font-medium">Registrati</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <Field id="email-login" label="Email" type="email" value={email} onChange={setEmail} />
-                <Field id="pwd-login" label="Password" type="password" value={password} onChange={setPassword} />
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? "Attendi..." : "Accedi"}
+                <PasswordField
+                  id="pwd-login"
+                  value={password}
+                  onChange={setPassword}
+                  show={showPassword}
+                  onToggle={() => setShowPassword((v) => !v)}
+                />
+                <Button type="submit" size="lg" className="w-full mt-2" disabled={submitting}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Accedi"}
                 </Button>
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={handleReset}
+                    className="text-muted-foreground"
+                  >
+                    Password dimenticata?
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <Field id="email-signup" label="Email" type="email" value={email} onChange={setEmail} />
-                <Field id="pwd-signup" label="Password" type="password" value={password} onChange={setPassword} />
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? "Attendi..." : "Crea account"}
+                <PasswordField
+                  id="pwd-signup"
+                  value={password}
+                  onChange={setPassword}
+                  show={showPassword}
+                  onToggle={() => setShowPassword((v) => !v)}
+                />
+                <Button type="submit" size="lg" className="w-full mt-2" disabled={submitting}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crea account"}
                 </Button>
               </form>
             </TabsContent>
@@ -117,6 +153,46 @@ function Field({
         required
         autoComplete={type === "password" ? "current-password" : "email"}
       />
+    </div>
+  );
+}
+
+function PasswordField({
+  id,
+  value,
+  onChange,
+  show,
+  onToggle,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  show: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Password</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+          autoComplete="current-password"
+          className="pr-10"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          aria-label={show ? "Nascondi password" : "Mostra password"}
+          tabIndex={-1}
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
     </div>
   );
 }
