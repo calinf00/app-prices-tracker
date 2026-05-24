@@ -46,6 +46,7 @@ function ProductsPage() {
         .select(
           "id, name, brand, category, image_url, purchases(price, purchase_date, store_name)",
         )
+        .is("merged_into", null)
         .limit(500);
       if (error) throw error;
       return (data ?? []) as unknown as Row[];

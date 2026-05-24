@@ -19,6 +19,7 @@ import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAssistantRouteImport } from './routes/_authenticated/assistant'
 import { Route as AuthenticatedScanGroupIdRouteImport } from './routes/_authenticated/scan.$groupId'
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
+import { Route as AuthenticatedProductsDuplicatesRouteImport } from './routes/_authenticated/products.duplicates'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 
 const AuthRoute = AuthRouteImport.update({
@@ -73,6 +74,12 @@ const AuthenticatedProductsNewRoute =
     path: '/new',
     getParentRoute: () => AuthenticatedProductsRoute,
   } as any)
+const AuthenticatedProductsDuplicatesRoute =
+  AuthenticatedProductsDuplicatesRouteImport.update({
+    id: '/duplicates',
+    path: '/duplicates',
+    getParentRoute: () => AuthenticatedProductsRoute,
+  } as any)
 const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping-list': typeof AuthenticatedShoppingListRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
+  '/products/duplicates': typeof AuthenticatedProductsDuplicatesRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
 }
@@ -100,6 +108,7 @@ export interface FileRoutesByTo {
   '/shopping-list': typeof AuthenticatedShoppingListRoute
   '/': typeof AuthenticatedIndexRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
+  '/products/duplicates': typeof AuthenticatedProductsDuplicatesRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
 }
@@ -114,6 +123,7 @@ export interface FileRoutesById {
   '/_authenticated/shopping-list': typeof AuthenticatedShoppingListRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
+  '/_authenticated/products/duplicates': typeof AuthenticatedProductsDuplicatesRoute
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/scan/$groupId': typeof AuthenticatedScanGroupIdRoute
 }
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/shopping-list'
     | '/products/$id'
+    | '/products/duplicates'
     | '/products/new'
     | '/scan/$groupId'
   fileRoutesByTo: FileRoutesByTo
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/shopping-list'
     | '/'
     | '/products/$id'
+    | '/products/duplicates'
     | '/products/new'
     | '/scan/$groupId'
   id:
@@ -153,6 +165,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shopping-list'
     | '/_authenticated/'
     | '/_authenticated/products/$id'
+    | '/_authenticated/products/duplicates'
     | '/_authenticated/products/new'
     | '/_authenticated/scan/$groupId'
   fileRoutesById: FileRoutesById
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsNewRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
+    '/_authenticated/products/duplicates': {
+      id: '/_authenticated/products/duplicates'
+      path: '/duplicates'
+      fullPath: '/products/duplicates'
+      preLoaderRoute: typeof AuthenticatedProductsDuplicatesRouteImport
+      parentRoute: typeof AuthenticatedProductsRoute
+    }
     '/_authenticated/products/$id': {
       id: '/_authenticated/products/$id'
       path: '/$id'
@@ -246,11 +266,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedProductsRouteChildren {
   AuthenticatedProductsIdRoute: typeof AuthenticatedProductsIdRoute
+  AuthenticatedProductsDuplicatesRoute: typeof AuthenticatedProductsDuplicatesRoute
   AuthenticatedProductsNewRoute: typeof AuthenticatedProductsNewRoute
 }
 
 const AuthenticatedProductsRouteChildren: AuthenticatedProductsRouteChildren = {
   AuthenticatedProductsIdRoute: AuthenticatedProductsIdRoute,
+  AuthenticatedProductsDuplicatesRoute: AuthenticatedProductsDuplicatesRoute,
   AuthenticatedProductsNewRoute: AuthenticatedProductsNewRoute,
 }
 
