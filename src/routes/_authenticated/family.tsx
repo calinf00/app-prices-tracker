@@ -385,14 +385,16 @@ function InvitesCard({
   return (
     <Card className="p-4 space-y-3">
       <div className="text-sm font-medium">Inviti</div>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           type="email"
           placeholder="email@esempio.it"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          className="w-full"
         />
         <Button
+          className="w-full sm:w-auto shrink-0 whitespace-nowrap btn-touch"
           onClick={() => {
             if (!email.trim()) return;
             onInvite(email);
