@@ -17,6 +17,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, UNITS } from "@/lib/categories";
+import { Switch } from "@/components/ui/switch";
+import { calcUnitPrices } from "@/lib/unit-conversion";
 
 export const Route = createFileRoute("/_authenticated/products/new")({
   component: NewProductPage,
@@ -39,6 +41,9 @@ function NewProductPage() {
   const [unit, setUnit] = useState<string>("pz");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [multiPack, setMultiPack] = useState(false);
+  const [itemsPerPack, setItemsPerPack] = useState<string>("");
+  const [volumePerItem, setVolumePerItem] = useState<string>("");
 
   const handleFile = (file: File) => {
     const r = new FileReader();
@@ -67,15 +72,34 @@ function NewProductPage() {
       if (pErr) throw pErr;
 
       if (price) {
-        const { error: puErr } = await supabase.from("purchases").insert({
+        const qty = Number(quantity) || 1;
+        const ipp = multiPack ? Math.max(1, Number(itemsPerPack) || 1) : 1;
+        const vpi = multiPack ? Number(volumePerItem) || 0 : 0;
+        const calc = calcUnitPrices(Number(price), qty, unit, ipp, vpi);
+        const base = {
           product_id: product.id,
           store_name: store.trim() || null,
           price: Number(price),
-          quantity: Number(quantity) || 1,
+          quantity: qty,
           unit,
           purchase_date: date,
           notes: notes.trim() || null,
-        });
+        };
+        const withUnitPrice = {
+          ...base,
+          price_per_base_unit: Number(calc.pricePerBaseUnit.toFixed(4)),
+          base_unit: calc.baseUnitLabel.replace("€/", ""),
+        };
+        let { error: puErr } = await supabase.from("purchases").insert(withUnitPrice);
+        if (puErr && /column|schema cache/i.test(puErr.message ?? "")) {
+          const retry = await supabase.from("purchases").insert(base);
+          puErr = retry.error;
+          if (!puErr) {
+            toast.warning(
+              "Colonne prezzo unitario non ancora disponibili — applica la migration Supabase",
+            );
+          }
+        }
         if (puErr) throw puErr;
       }
 
@@ -181,6 +205,17 @@ function NewProductPage() {
             </Select>
           </div>
         </div>
+        <UnitPriceFields
+          price={price}
+          quantity={quantity}
+          unit={unit}
+          multiPack={multiPack}
+          setMultiPack={setMultiPack}
+          itemsPerPack={itemsPerPack}
+          setItemsPerPack={setItemsPerPack}
+          volumePerItem={volumePerItem}
+          setVolumePerItem={setVolumePerItem}
+        />
         <div>
           <Label className="text-xs">Note</Label>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opzionale" rows={2} />
@@ -194,5 +229,94 @@ function NewProductPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export function UnitPriceFields({
+  price,
+  quantity,
+  unit,
+  multiPack,
+  setMultiPack,
+  itemsPerPack,
+  setItemsPerPack,
+  volumePerItem,
+  setVolumePerItem,
+}: {
+  price: string;
+  quantity: string;
+  unit: string;
+  multiPack: boolean;
+  setMultiPack: (v: boolean) => void;
+  itemsPerPack: string;
+  setItemsPerPack: (v: string) => void;
+  volumePerItem: string;
+  setVolumePerItem: (v: string) => void;
+}) {
+  const unitLabel =
+    unit === "l" || unit === "ml" ? "litri" : unit === "kg" || unit === "g" ? "kg" : "pezzi";
+  const isWeightOrVolume = ["kg", "g", "l", "ml"].includes(unit);
+  const p = Number(price);
+  const preview =
+    Number.isFinite(p) && p > 0
+      ? calcUnitPrices(
+          p,
+          Number(quantity) || 1,
+          unit,
+          multiPack ? Math.max(1, Number(itemsPerPack) || 1) : 1,
+          multiPack ? Number(volumePerItem) || 0 : 0,
+        )
+      : null;
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-md border border-border p-2">
+        <Label htmlFor="multipack" className="text-xs cursor-pointer">
+          Confezione multipla?
+        </Label>
+        <Switch id="multipack" checked={multiPack} onCheckedChange={setMultiPack} />
+      </div>
+      {multiPack && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">N° pezzi nella confezione</Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="Es. 6"
+              value={itemsPerPack}
+              onChange={(e) => setItemsPerPack(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Per pezzo (in {unitLabel})</Label>
+            <Input
+              type="number"
+              step="0.001"
+              placeholder="Es. 1.5"
+              value={volumePerItem}
+              onChange={(e) => setVolumePerItem(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      {preview && (
+        <div className="rounded-md bg-muted/60 p-2 text-xs space-y-0.5">
+          <div className="font-medium text-muted-foreground">Riepilogo prezzi unitari</div>
+          <div>
+            Totale: €{p.toFixed(2)} per {quantity || 1} {unit}
+          </div>
+          {preview.pricePerPiece !== null && (
+            <div>Prezzo al pezzo: €{preview.pricePerPiece.toFixed(2)}</div>
+          )}
+          {(isWeightOrVolume || (multiPack && Number(volumePerItem) > 0)) && (
+            <div>
+              Prezzo al {preview.baseUnitLabel.replace("€/", "")}: €
+              {preview.pricePerBaseUnit.toFixed(2)}
+              {preview.baseUnitLabel}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }

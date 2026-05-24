@@ -43,6 +43,8 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, CATEGORIES, STORE_COLORS, UNITS } from "@/lib/categories";
+import { calcUnitPrices } from "@/lib/unit-conversion";
+import { UnitPriceFields } from "./products.new";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   component: ProductDetailPage,
@@ -56,6 +58,8 @@ type Purchase = {
   unit: string | null;
   purchase_date: string;
   notes: string | null;
+  price_per_base_unit?: number | null;
+  base_unit?: string | null;
 };
 
 type ProductRow = {
@@ -78,15 +82,25 @@ function ProductDetailPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["product", id],
     queryFn: async () => {
-      const [{ data: product, error: e1 }, { data: purchases, error: e2 }] =
-        await Promise.all([
-          supabase.from("products").select("id, name, brand, category, image_url").eq("id", id).single(),
-          supabase
-            .from("purchases")
-            .select("id, store_name, price, quantity, unit, purchase_date, notes")
-            .eq("product_id", id)
-            .order("purchase_date", { ascending: true }),
-        ]);
+      const productPromise = supabase
+        .from("products")
+        .select("id, name, brand, category, image_url")
+        .eq("id", id)
+        .single();
+      let purchasesRes: any = await supabase
+        .from("purchases")
+        .select("id, store_name, price, quantity, unit, purchase_date, notes, price_per_base_unit, base_unit")
+        .eq("product_id", id)
+        .order("purchase_date", { ascending: true });
+      if (purchasesRes.error && /column|schema cache/i.test(purchasesRes.error.message ?? "")) {
+        purchasesRes = await supabase
+          .from("purchases")
+          .select("id, store_name, price, quantity, unit, purchase_date, notes")
+          .eq("product_id", id)
+          .order("purchase_date", { ascending: true });
+      }
+      const { data: product, error: e1 } = await productPromise;
+      const { data: purchases, error: e2 } = purchasesRes;
       if (e1) throw e1;
       if (e2) throw e2;
       return {
@@ -359,7 +373,25 @@ function ProductDetailPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className="font-semibold">€{x.price.toFixed(2)}</div>
+                  <div className="flex flex-col items-end">
+                    <div className="font-semibold">€{x.price.toFixed(2)}</div>
+                    {(() => {
+                      const ppbu =
+                        x.price_per_base_unit ??
+                        (x.quantity && x.quantity > 0
+                          ? calcUnitPrices(x.price, x.quantity, x.unit ?? "pz").pricePerBaseUnit
+                          : null);
+                      const bu =
+                        x.base_unit ??
+                        (x.unit ? calcUnitPrices(x.price, x.quantity ?? 1, x.unit).baseUnitLabel.replace("€/", "") : null);
+                      if (!ppbu || !bu) return null;
+                      return (
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          €{ppbu.toFixed(2)}/{bu}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <Button size="icon" variant="ghost" onClick={() => setEditing(x)} aria-label="Modifica">
                     <Pencil className="h-4 w-4 text-muted-foreground" />
                   </Button>
@@ -487,6 +519,9 @@ function PurchaseDialog({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [multiPack, setMultiPack] = useState(false);
+  const [itemsPerPack, setItemsPerPack] = useState<string>("");
+  const [volumePerItem, setVolumePerItem] = useState<string>("");
 
   // Sync when dialog opens
   useEffect(() => {
@@ -497,6 +532,9 @@ function PurchaseDialog({
       setUnit(purchase?.unit ?? "pz");
       setDate(purchase?.purchase_date ?? new Date().toISOString().slice(0, 10));
       setNotes(purchase?.notes ?? "");
+      setMultiPack(false);
+      setItemsPerPack("");
+      setVolumePerItem("");
     }
   }, [open, purchase]);
 
@@ -507,22 +545,39 @@ function PurchaseDialog({
     }
     setSaving(true);
     try {
+      const qty = Number(quantity) || 1;
+      const ipp = multiPack ? Math.max(1, Number(itemsPerPack) || 1) : 1;
+      const vpi = multiPack ? Number(volumePerItem) || 0 : 0;
+      const calc = calcUnitPrices(Number(price), qty, unit, ipp, vpi);
       const payload = {
         product_id: productId,
         store_name: store.trim() || null,
         price: Number(price),
-        quantity: Number(quantity) || 1,
+        quantity: qty,
         unit,
         purchase_date: date,
         notes: notes.trim() || null,
       };
-      if (isEdit && purchase) {
-        const { error } = await supabase.from("purchases").update(payload).eq("id", purchase.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("purchases").insert(payload);
-        if (error) throw error;
+      const withUnitPrice = {
+        ...payload,
+        price_per_base_unit: Number(calc.pricePerBaseUnit.toFixed(4)),
+        base_unit: calc.baseUnitLabel.replace("€/", ""),
+      };
+      const exec = async (body: any) =>
+        isEdit && purchase
+          ? supabase.from("purchases").update(body).eq("id", purchase.id)
+          : supabase.from("purchases").insert(body);
+      let { error } = await exec(withUnitPrice);
+      if (error && /column|schema cache/i.test(error.message ?? "")) {
+        const retry = await exec(payload);
+        error = retry.error;
+        if (!error) {
+          toast.warning(
+            "Colonne prezzo unitario non ancora disponibili — applica la migration Supabase",
+          );
+        }
       }
+      if (error) throw error;
       toast.success(isEdit ? "Acquisto aggiornato" : "Acquisto aggiunto");
       onSaved();
     } catch (e: any) {
@@ -570,6 +625,17 @@ function PurchaseDialog({
               </Select>
             </div>
           </div>
+          <UnitPriceFields
+            price={price}
+            quantity={quantity}
+            unit={unit}
+            multiPack={multiPack}
+            setMultiPack={setMultiPack}
+            itemsPerPack={itemsPerPack}
+            setItemsPerPack={setItemsPerPack}
+            volumePerItem={volumePerItem}
+            setVolumePerItem={setVolumePerItem}
+          />
           <div>
             <Label className="text-xs">Note</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
