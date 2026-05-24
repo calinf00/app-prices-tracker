@@ -167,7 +167,7 @@ function SettingsPage() {
   };
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Account / nome */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium">

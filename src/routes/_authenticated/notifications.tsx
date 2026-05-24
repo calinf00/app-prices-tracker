@@ -26,7 +26,7 @@ function NotificationsPage() {
   const invites = family.myInvites ?? [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Bell className="h-5 w-5 text-primary" />
         <h2 className="text-xl font-semibold">Notifiche</h2>
@@ -39,7 +39,7 @@ function NotificationsPage() {
       ) : (
         <div className="space-y-3">
           {invites.map((inv) => (
-            <Card key={inv.id} className="p-4 border-l-4 border-l-primary">
+            <Card key={inv.id} className="p-5 border-l-4 border-l-primary">
               <div className="flex items-start gap-3">
                 <Users className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
