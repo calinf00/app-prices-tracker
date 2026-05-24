@@ -28,24 +28,21 @@ export const mergeProductsFn = createServerFn({ method: "POST" })
     const { error: e1 } = await supabase
       .from("purchases")
       .update({ product_id: data.canonicalProductId })
-      .eq("product_id", data.mergedProductId)
-      .eq("user_id", userId);
+      .eq("product_id", data.mergedProductId);
     if (e1) throw new Error(`Errore aggiornamento acquisti: ${e1.message}`);
 
     // Repoint shopping_list
     const { error: e2 } = await supabase
       .from("shopping_list")
       .update({ product_id: data.canonicalProductId })
-      .eq("product_id", data.mergedProductId)
-      .eq("user_id", userId);
+      .eq("product_id", data.mergedProductId);
     if (e2) console.warn("[mergeProducts] shopping_list update warn", e2.message);
 
     // Mark soft-merge
     const { error: e3 } = await supabase
       .from("products")
       .update({ merged_into: data.canonicalProductId })
-      .eq("id", data.mergedProductId)
-      .eq("user_id", userId);
+      .eq("id", data.mergedProductId);
     if (e3) throw new Error(`Errore aggiornamento prodotto: ${e3.message}`);
 
     // Record mapping (upsert via unique constraint)
@@ -79,14 +76,12 @@ export const unmergeProductsFn = createServerFn({ method: "POST" })
     const { error: e1 } = await supabase
       .from("products")
       .update({ merged_into: null })
-      .eq("id", data.mergedProductId)
-      .eq("user_id", userId);
+      .eq("id", data.mergedProductId);
     if (e1) throw new Error(e1.message);
     const { error: e2 } = await supabase
       .from("product_merge_map")
       .delete()
-      .eq("merged_product_id", data.mergedProductId)
-      .eq("user_id", userId);
+      .eq("merged_product_id", data.mergedProductId);
     if (e2) throw new Error(e2.message);
     return { ok: true };
   });
@@ -120,8 +115,7 @@ export const removeDismissedPairFn = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("product_dedup_dismissed")
       .delete()
-      .eq("id", data.id)
-      .eq("user_id", userId);
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
