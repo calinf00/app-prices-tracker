@@ -14,6 +14,7 @@ import {
   Check,
   X,
   Loader2,
+  UserPlus,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { UNITS } from "@/lib/categories";
 import { estimatePrice, smartShoppingList } from "@/lib/openai.functions";
 import { convertToBaseUnit, baseUnitOf, isSubUnit, calcUnitPrices, estimateCost } from "@/lib/unit-conversion";
+import { useFamily } from "@/hooks/use-family";
+import { useAuth } from "@/hooks/use-auth";
+import { FamilyAvatar } from "@/components/family-avatar";
 
 export const Route = createFileRoute("/_authenticated/shopping-list")({
   component: ShoppingListPage,
@@ -61,6 +65,8 @@ type Item = {
   unit: string | null;
   is_purchased: boolean;
   created_at?: string;
+  user_id?: string | null;
+  assigned_to?: string | null;
 };
 
 type PriceRange = {
@@ -114,6 +120,10 @@ function ShoppingListPage() {
   const qc = useQueryClient();
   const estimatePriceFn = useServerFn(estimatePrice);
   const smartListFn = useServerFn(smartShoppingList);
+  const { user } = useAuth();
+  const family = useFamily();
+  const hasFamily = !!family.family;
+  const [scope, setScope] = useState<"mine" | "family">("family");
 
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
@@ -146,13 +156,36 @@ function ShoppingListPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shopping_list")
-        .select("id, product_name, quantity, unit, is_purchased, created_at")
+        .select("id, product_name, quantity, unit, is_purchased, created_at, user_id, assigned_to")
         .order("is_purchased", { ascending: true })
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Item[];
     },
   });
+
+  // Realtime sync for family-shared list
+  useEffect(() => {
+    const channel = supabase
+      .channel("family-shopping-list-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shopping_list" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["shopping_list"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
+  const visibleItems = useMemo(() => {
+    if (!items) return [] as Item[];
+    if (!hasFamily || scope === "family") return items;
+    return items.filter((i) => !i.user_id || (user && i.user_id === user.id));
+  }, [items, scope, hasFamily, user]);
 
   // Full product catalog with min/max prices for ranges + suggestions
   const { data: productStats } = useQuery({
@@ -258,6 +291,7 @@ function ShoppingListPage() {
         quantity: payload.quantity,
         unit: payload.unit,
         is_purchased: false,
+        user_id: user?.id ?? null,
       });
       if (error) throw error;
       pushRecent(payload.product_name);
@@ -269,6 +303,22 @@ function ShoppingListPage() {
       setSuggestOpen(false);
       setActiveIdx(-1);
       setRecents(loadJSON<string[]>(RECENTS_KEY, []));
+      qc.invalidateQueries({ queryKey: ["shopping_list"] });
+    },
+    onError: (e: Error) => toast.error(toUserMessage(e)),
+  });
+
+  const assignToMe = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("Non autenticato");
+      const { error } = await supabase
+        .from("shopping_list")
+        .update({ assigned_to: user.id })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Assegnato a te");
       qc.invalidateQueries({ queryKey: ["shopping_list"] });
     },
     onError: (e: Error) => toast.error(toUserMessage(e)),
@@ -450,6 +500,7 @@ function ShoppingListPage() {
         quantity: it.quantity,
         unit: it.unit,
         is_purchased: false,
+        user_id: user?.id ?? null,
       }));
       const { error } = await supabase.from("shopping_list").insert(rows);
       if (error) throw error;
@@ -498,6 +549,7 @@ function ShoppingListPage() {
             quantity: 1,
             unit: "pz",
             is_purchased: false,
+            user_id: user?.id ?? null,
           })),
         );
       if (error) throw error;
