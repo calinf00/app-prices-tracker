@@ -216,7 +216,7 @@ function ProductsPage() {
           {data?.length === 0 ? "Nessun prodotto. Aggiungine uno!" : "Nessun risultato."}
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filtered.map((p) => {
             const meta = categoryMeta(p.category);
             const Icon = meta.icon;
@@ -224,7 +224,7 @@ function ProductsPage() {
             const owner = isOther ? family.getMember(p.user_id) : null;
             return (
               <Link key={p.id} to="/products/$id" params={{ id: p.id }}>
-                <Card className="relative p-3 flex items-center gap-3 hover:border-primary/40 transition-colors">
+                <Card className="p-4 pr-5 flex items-center gap-4 hover:border-primary/40 transition-colors">
                   <div className={`h-12 w-12 rounded-lg overflow-hidden grid place-items-center shrink-0 ${meta.className}`}>
                     {p.image_url ? (
                       <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
@@ -232,27 +232,28 @@ function ProductsPage() {
                       <Icon className="h-5 w-5" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{p.name}</div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="font-medium truncate leading-tight">{p.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {[p.brand, p.category].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
-                  {p.lastPrice !== null && (
-                    <div className="text-right shrink-0">
-                      <div className="font-semibold">€{p.lastPrice.toFixed(2)}</div>
-                      <div className="text-[10px] text-muted-foreground">ultimo</div>
-                    </div>
-                  )}
-                  {owner && (
-                    <FamilyAvatar
-                      name={owner.display_name || owner.email}
-                      userId={owner.user_id}
-                      size="xs"
-                      className="absolute top-1.5 right-1.5 ring-2 ring-background"
-                      title={`Aggiunto da ${owner.display_name || owner.email}`}
-                    />
-                  )}
+                  <div className="flex flex-col items-end gap-1.5 shrink-0 ml-2">
+                    {owner && (
+                      <FamilyAvatar
+                        name={owner.display_name || owner.email}
+                        userId={owner.user_id}
+                        size="xs"
+                        title={`Aggiunto da ${owner.display_name || owner.email}`}
+                      />
+                    )}
+                    {p.lastPrice !== null && (
+                      <div className="text-right leading-tight">
+                        <div className="font-semibold tabular-nums">€{p.lastPrice.toFixed(2)}</div>
+                        <div className="text-[10px] text-muted-foreground">ultimo</div>
+                      </div>
+                    )}
+                  </div>
                 </Card>
               </Link>
             );
