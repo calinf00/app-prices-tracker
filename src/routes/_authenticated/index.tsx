@@ -181,9 +181,9 @@ function HomePage() {
   }, [q, data]);
 
   return (
-    <div className="space-y-8 md:space-y-10 relative">
+    <div className="space-y-10 md:space-y-12 relative pb-8">
       {/* Greeting */}
-      <section className="space-y-1">
+      <section className="space-y-1.5">
         <h2 className="text-2xl font-bold tracking-tight">
           Ciao {firstName}
         </h2>
@@ -192,21 +192,21 @@ function HomePage() {
 
       {/* AI Assistant quick access */}
       <Link to="/assistant">
-        <Card className="p-4 flex items-center gap-3 border-primary/20 hover:border-primary/40 transition-colors bg-primary/5">
+        <Card className="p-4 flex items-center gap-4 border-primary/20 hover:border-primary/40 transition-colors bg-primary/5">
           <div className="h-10 w-10 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0">
             <Bot className="h-5 w-5" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="font-medium text-sm">Assistente AI</div>
-            <div className="text-xs text-muted-foreground">Chiedi consigli sulla spesa, analizza i prezzi</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Chiedi consigli sulla spesa, analizza i prezzi</div>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         </Card>
       </Link>
 
       {/* Search */}
-      <section className="space-y-2">
-        <div className="relative mb-4">
+      <section className="space-y-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Cerca un prodotto..."
@@ -242,9 +242,9 @@ function HomePage() {
       </section>
 
       {/* Stats - horizontal scroll */}
-      <section className="mb-2">
+      <section>
         <div className="-mx-4 px-4 overflow-x-auto">
-          <div className="flex gap-3 min-w-max pb-1">
+          <div className="flex gap-4 min-w-max pb-2">
             <StatCard icon={Package} label="Prodotti tracciati" value={String(data?.productsCount ?? 0)} />
             <StatCard icon={Receipt} label="Acquisti questo mese" value={String(data?.monthCount ?? 0)} />
             <StatCard icon={Store} label="Negozio top" value={data?.topStore ?? "—"} />
@@ -255,7 +255,7 @@ function HomePage() {
 
       {/* Recent purchases */}
       <section>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Ultimi acquisti</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-4 px-1">Ultimi acquisti</h3>
         {!data ? (
           <p className="text-sm text-muted-foreground px-1">Caricamento...</p>
         ) : data.recent.length === 0 ? (
@@ -267,21 +267,21 @@ function HomePage() {
             {data.recent.map((p) => {
               const Icon = iconForCategory(p.products?.category);
               const inner = (
-                <Card className="p-3 flex items-center gap-3 hover:border-primary/40 transition-colors">
-                  <div className="h-10 w-10 shrink-0 rounded-lg bg-primary/15 text-primary grid place-items-center">
+                <Card className="p-4 pr-5 flex items-center gap-4 hover:border-primary/40 transition-colors">
+                  <div className="h-11 w-11 shrink-0 rounded-lg bg-primary/15 text-primary grid place-items-center">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{p.products?.name ?? "Prodotto"}</div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="font-medium text-sm truncate leading-tight">{p.products?.name ?? "Prodotto"}</div>
+                    <div className="text-xs text-muted-foreground truncate mt-1">
                       {p.store_name ?? "—"} ·{" "}
                       {new Date(p.purchase_date).toLocaleDateString("it-IT")}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold">€{Number(p.price).toFixed(2)}</div>
+                  <div className="text-right shrink-0 pl-2">
+                    <div className="font-semibold tabular-nums leading-tight">€{Number(p.price).toFixed(2)}</div>
                     {p.quantity ? (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground mt-1 tabular-nums">
                         x{p.quantity} {p.unit ?? ""}
                       </div>
                     ) : null}
@@ -302,7 +302,7 @@ function HomePage() {
 
       {/* Price alerts */}
       <section>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-4 px-1 flex items-center gap-2">
           <Tag className="h-4 w-4" /> Avvisi prezzi
         </h3>
         {!data || data.alerts.length === 0 ? (
@@ -319,9 +319,9 @@ function HomePage() {
                   to="/products/$id"
                   params={{ id: a.productId }}
                 >
-                  <Card className="p-3 flex items-center gap-3 hover:border-primary/40 transition-colors">
+                  <Card className="p-4 pr-5 flex items-center gap-4 hover:border-primary/40 transition-colors">
                     <div
-                      className={`h-10 w-10 shrink-0 rounded-lg grid place-items-center ${
+                      className={`h-11 w-11 shrink-0 rounded-lg grid place-items-center ${
                         up
                           ? "bg-destructive/15 text-destructive"
                           : "bg-primary/15 text-primary"
@@ -334,13 +334,13 @@ function HomePage() {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">{a.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="font-medium text-sm truncate leading-tight">{a.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1 tabular-nums">
                         €{a.oldPrice.toFixed(2)} → €{a.newPrice.toFixed(2)}
                       </div>
                     </div>
                     <div
-                      className={`text-sm font-semibold ${
+                      className={`text-sm font-semibold shrink-0 pl-2 tabular-nums ${
                         up ? "text-destructive" : "text-primary"
                       }`}
                     >
@@ -389,11 +389,11 @@ function StatCard({
   value: string;
 }) {
   return (
-    <Card className="p-4 min-h-[64px] min-w-[160px] max-w-[200px]">
+    <Card className="p-4 min-h-[88px] min-w-[170px] max-w-[210px] flex flex-col justify-between">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="h-4 w-4" /> {label}
       </div>
-      <div className="mt-2 text-xl font-bold truncate">{value}</div>
+      <div className="mt-3 text-xl font-bold truncate">{value}</div>
     </Card>
   );
 }
