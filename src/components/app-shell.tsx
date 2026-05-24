@@ -110,7 +110,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active = exact
               ? pathname === to
               : pathname === to || pathname.startsWith(to + "/");
-            const showDot = to === "/family" && pendingInvite;
             return (
               <Link
                 key={to}
