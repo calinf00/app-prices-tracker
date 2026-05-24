@@ -341,7 +341,9 @@ function ScanPage() {
             if (retry?.[0]?.id) {
               productId = retry[0].id;
             } else {
-              throw new Error(`Impossibile salvare il prodotto "${cleanName}"`);
+              throw new Error(
+                `Impossibile salvare il prodotto "${cleanName}": ${pErr.message}`,
+              );
             }
           } else {
             productId = created.id;
@@ -365,7 +367,9 @@ function ScanPage() {
         const { error: puErr } = await supabase.from("purchases").insert(purchasePayload);
         if (puErr) {
           console.error("[scan.save] purchase insert error", puErr);
-          throw new Error(`Impossibile salvare l'acquisto "${cleanName}"`);
+          throw new Error(
+            `Impossibile salvare l'acquisto "${cleanName}": ${puErr.message}`,
+          );
         }
       }
       if (hasFamily && shareWithFamily && familySize > 1) {
@@ -392,7 +396,12 @@ function ScanPage() {
       }
     } catch (e: any) {
       console.error("[scan.save] failed", e);
-      toast.error(toUserMessage(e, "Errore salvataggio"));
+      // Surface the real underlying message: these errors are app-controlled
+      // (we construct them above) and crucial for the user to fix the input.
+      const msg = typeof e?.message === "string" && e.message
+        ? e.message
+        : "Errore salvataggio";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
