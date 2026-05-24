@@ -66,8 +66,21 @@ function FamilyPage() {
       {f.myInvites.length > 0 && (
         <ReceivedInvites
           invites={f.myInvites}
-          onAccept={(inv) => f.acceptInvite(inv).then(() => toast.success("Invito accettato")).catch((e) => toast.error(toUserMessage(e)))}
-          onDecline={(id) => f.declineInvite(id).then(() => toast.success("Invito rifiutato")).catch((e) => toast.error(toUserMessage(e)))}
+          onAccept={(inv) =>
+            f
+              .acceptInvite(inv)
+              .then(() => {
+                toast.success("Sei entrato nella famiglia!");
+                window.location.reload();
+              })
+              .catch((e) => toast.error(toUserMessage(e)))
+          }
+          onDecline={(id) =>
+            f
+              .declineInvite(id)
+              .then(() => toast.success("Invito rifiutato"))
+              .catch((e) => toast.error(toUserMessage(e)))
+          }
         />
       )}
 
@@ -498,6 +511,10 @@ function ReceivedInvites({
   onDecline: (id: string) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState<{ id: string; action: "accept" | "decline" } | null>(null);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+
+  const visible = invites.filter((inv) => !removedIds.includes(inv.id));
+  if (visible.length === 0) return null;
 
   return (
     <Card className="p-4 space-y-3 border-l-4 border-l-primary">
@@ -508,7 +525,7 @@ function ReceivedInvites({
         <div className="text-sm font-medium">Inviti ricevuti</div>
       </div>
       <ul className="space-y-3">
-        {invites.map((inv) => (
+        {visible.map((inv) => (
           <li key={inv.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">
@@ -526,7 +543,10 @@ function ReceivedInvites({
                 onClick={() => {
                   setBusy({ id: inv.id, action: "decline" });
                   onDecline(inv.id)
-                    .then(() => setBusy(null))
+                    .then(() => {
+                      setRemovedIds((prev) => [...prev, inv.id]);
+                      setBusy(null);
+                    })
                     .catch(() => setBusy(null));
                 }}
               >
@@ -543,7 +563,10 @@ function ReceivedInvites({
                 onClick={() => {
                   setBusy({ id: inv.id, action: "accept" });
                   onAccept(inv)
-                    .then(() => setBusy(null))
+                    .then(() => {
+                      setRemovedIds((prev) => [...prev, inv.id]);
+                      setBusy(null);
+                    })
                     .catch(() => setBusy(null));
                 }}
               >
