@@ -113,7 +113,7 @@ function NewProductPage() {
 
       toast.success("Prodotto creato");
       navigate({ to: "/products/$id", params: { id: product.id } });
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
