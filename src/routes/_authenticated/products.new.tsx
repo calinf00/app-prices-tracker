@@ -58,6 +58,12 @@ function NewProductPage() {
     }
     setSaving(true);
     try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (userErr || !userId) {
+        throw new Error("Sessione scaduta, effettua di nuovo l'accesso");
+      }
+
       const { data: product, error: pErr } = await supabase
         .from("products")
         .insert({
@@ -66,6 +72,7 @@ function NewProductPage() {
           category,
           barcode: barcode.trim() || null,
           image_url: imageDataUrl,
+          user_id: userId,
         })
         .select("id")
         .single();
@@ -78,6 +85,7 @@ function NewProductPage() {
         const calc = calcUnitPrices(Number(price), qty, unit, ipp, vpi);
         const base = {
           product_id: product.id,
+          user_id: userId,
           store_name: store.trim() || null,
           price: Number(price),
           quantity: qty,
