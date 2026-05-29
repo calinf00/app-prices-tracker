@@ -326,9 +326,11 @@ function ScanPage() {
         let wasCreated = false;
         if (!productId) {
           console.log("[scan.save] creating product", cleanName);
+          const productPayload = { name: cleanName, category: item.category, user_id: uid };
+          console.log("[scan.save] inserting product payload", productPayload);
           const { data: created, error: pErr } = await supabase
             .from("products")
-            .insert({ name: cleanName, category: item.category, user_id: uid })
+            .insert(productPayload)
             .select("id")
             .single();
           if (pErr) {
@@ -394,13 +396,22 @@ function ScanPage() {
       qc.invalidateQueries({ queryKey: ["recent-scans"] });
       qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
       qc.invalidateQueries({ queryKey: ["known-stores"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["purchases"] });
 
       // Run AI dedup over the newly created products against the rest of the catalog.
-      const candidates = await runDedupCheck(newlyCreated);
+      let candidates: DedupPair[] = [];
+      try {
+        candidates = await runDedupCheck(newlyCreated);
+      } catch (dedupErr) {
+        console.warn("[scan.save] dedup check threw", dedupErr);
+        candidates = [];
+      }
       if (candidates.length > 0) {
         setDedupPairs(candidates);
         setDedupOpen(true);
       } else {
+        toast.info("Salvataggio completato, torno alla home…");
         setTimeout(() => {
           resetAll();
           navigate({ to: "/" });
