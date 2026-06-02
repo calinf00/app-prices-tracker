@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Trash2, Save, Camera, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Save, Camera, Loader2, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +57,8 @@ import { categoryMeta, CATEGORIES, STORE_COLORS, UNITS } from "@/lib/categories"
 import { calcUnitPrices } from "@/lib/unit-conversion";
 import { UnitPriceFields } from "./products.new";
 import { compressImage } from "@/lib/image-compress";
+import { findProductImageFn } from "@/lib/product-image-search.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   component: ProductDetailPage,
@@ -91,6 +93,8 @@ function ProductDetailPage() {
   const [editProductOpen, setEditProductOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [searchingImage, setSearchingImage] = useState(false);
+  const findProductImage = useServerFn(findProductImageFn);
 
   const { data, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -231,6 +235,20 @@ function ProductDetailPage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (file) uploadImage(file);
+  };
+
+  const searchImageWithAI = async () => {
+    setSearchingImage(true);
+    try {
+      await findProductImage({ data: { productId: id } });
+      toast.success("Foto trovata e impostata");
+      qc.invalidateQueries({ queryKey: ["product", id] });
+      qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+    } catch (e: any) {
+      toast.error(toUserMessage(e, "Ricerca foto fallita"));
+    } finally {
+      setSearchingImage(false);
+    }
   };
 
   const stats = useMemo(() => {
