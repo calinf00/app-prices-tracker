@@ -342,14 +342,36 @@ function ProductDetailPage() {
             {[p.brand, p.category].filter(Boolean).join(" · ") || "—"}
           </p>
           {p.image_url && (
-            <button
-              type="button"
-              onClick={removeImage}
-              disabled={uploadingImage}
-              className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
-            >
-              <X className="h-3 w-3" /> Rimuovi foto
-            </button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={uploadingImage}
+                  className="mt-1 h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Rimuovi foto
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Rimuovere la foto?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La foto del prodotto verrà eliminata. Potrai sempre caricarne una nuova.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={removeImage}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Rimuovi
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
         <Button
