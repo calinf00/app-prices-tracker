@@ -446,6 +446,18 @@ function ProductDetailPage() {
         </Button>
       </Card>
 
+      {p.image_url && (
+        <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+          <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-background/95 backdrop-blur border-none">
+            <img
+              src={p.image_url}
+              alt={p.name}
+              className="w-full h-auto max-h-[80vh] object-contain"
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
       {chartData.length > 0 && (
         <Card className="p-3">
           <div className="text-xs text-muted-foreground mb-2 px-1">Andamento prezzi per negozio</div>
