@@ -1,59 +1,50 @@
-## Obiettivo
+## Problema
 
-Permettere all'utente di caricare (e sostituire/rimuovere) una foto descrittiva per ogni prodotto dalla pagina **Dettaglio prodotto**. La foto verrà mostrata nell'header del dettaglio (al posto dell'icona categoria) e nelle liste che già usano `image_url`.
+Lo scanner segnala che `public.fill_family_member_info()` è una funzione `SECURITY DEFINER` esposta tramite `/rest/v1/rpc/...` ed eseguibile dal ruolo `anon` (utenti non autenticati). Questo è rischioso perché esegue con i privilegi del proprietario bypassando RLS.
 
-## Stato attuale
+La funzione non è presente nelle migrations del progetto (probabilmente creata manualmente nel SQL Editor o ereditata). Esistono però altre funzioni `SECURITY DEFINER` simili (`is_family_member`, `is_family_owner`, `my_family_ids`, `is_same_family_user`, `is_family_owned`, `set_user_id_from_auth`) che meritano la stessa protezione.
 
-- La tabella `products` ha già la colonna `image_url` (nullable, text).
-- Il dettaglio prodotto (`src/routes/_authenticated/products.$id.tsx`) **legge** già `image_url` e la mostra nell'avatar in alto.
-- Manca: UI per caricare/cambiare/rimuovere la foto e lo storage bucket dove salvare i file.
+## Soluzione
 
-## Cosa fare
+Creare una nuova migration che **revoca `EXECUTE` dal ruolo `anon` e da `PUBLIC`** su tutte le funzioni `SECURITY DEFINER` interne, lasciando `EXECUTE` solo a `authenticated` (e `service_role`). Queste funzioni servono solo come helper per le policy RLS — non devono essere chiamate via REST.
 
-### 1. Storage bucket
+Non convertiamo a `SECURITY INVOKER`: ci servono come `DEFINER` per evitare ricorsione infinita nelle policy RLS di `family_members` (vedi migration `20260601130000_fix_family_members_recursion.sql`).
 
-Creare un bucket pubblico `product-images` su Lovable Cloud con policy RLS su `storage.objects`:
-- SELECT pubblico (chiunque può vedere le foto: servono nelle liste).
-- INSERT / UPDATE / DELETE solo per `authenticated` e solo sui file nel proprio "folder" (`{user_id}/...`), così ogni utente gestisce solo le proprie immagini.
+## Migration
 
-### 2. UI nel dettaglio prodotto
+Nuovo file: `supabase/migrations/<timestamp>_lock_down_security_definer_functions.sql`
 
-Nella card header del prodotto (riga con icona + nome):
-- Se non c'è foto: l'icona categoria attuale resta visibile, ma diventa cliccabile e mostra al hover/tap un overlay "Aggiungi foto" che apre il file picker.
-- Se c'è foto: la foto è mostrata come oggi; al hover/tap appare un piccolo menu con **Cambia foto** e **Rimuovi foto**.
-- Mostrare uno spinner sull'avatar durante l'upload.
-- Compressione lato client riusando `src/lib/image-compress.ts` (max ~1200px, JPEG q≈0.85) per limitare la dimensione.
-- Toast di successo / errore via `toUserMessage`.
+```sql
+-- Revoke public execution on internal SECURITY DEFINER helpers.
+-- These exist only as RLS helpers and must NOT be callable via PostgREST RPC by anon.
 
-### 3. Flusso di upload
-
-1. Comprimi l'immagine.
-2. Upload su `product-images/{user_id}/{product_id}-{timestamp}.jpg` con `upsert: true`.
-3. Recupera la `publicUrl` e fai `update` su `products.image_url`.
-4. Se l'aggiornamento del record va a buon fine e c'era una foto precedente caricata da noi (path che inizia con `{user_id}/`), elimina il vecchio file dal bucket per non accumulare orfani.
-5. Invalida `["product", id]` e `["products-with-purchases"]`.
-
-### 4. Rimozione foto
-
-- `update products set image_url = null` + delete del file dal bucket (se appartiene all'utente).
-
-## Dettagli tecnici
-
-**File toccati**
-- `supabase/migrations/<timestamp>_product_images_bucket.sql` — policy RLS su `storage.objects` per il bucket (il bucket si crea via tool).
-- `src/routes/_authenticated/products.$id.tsx` — header avatar interattivo + nuova mutation `uploadImage` / `removeImage`. Niente modifiche al `ProductEditDialog` (lo gestisco direttamente nell'header, è più immediato).
-
-**Pattern RLS storage.objects (esempio)**
-```text
-bucket_id = 'product-images'
-AND (storage.foldername(name))[1] = auth.uid()::text
+DO $$
+DECLARE
+  fn text;
+BEGIN
+  FOREACH fn IN ARRAY ARRAY[
+    'public.fill_family_member_info()',
+    'public.my_family_ids()',
+    'public.is_family_member(uuid, uuid)',
+    'public.is_family_owner(uuid, uuid)',
+    'public.is_same_family_user(uuid, uuid)',
+    'public.is_family_owned(uuid)',
+    'public.set_user_id_from_auth()'
+  ]
+  LOOP
+    BEGIN
+      EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', fn);
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role', fn);
+    EXCEPTION WHEN undefined_function THEN
+      -- skip functions that don't exist in this DB
+      NULL;
+    END;
+  END LOOP;
+END $$;
 ```
 
-**Niente di rotto**: la UI esistente continua a funzionare perché il rendering condizionale su `image_url` è già presente. Nessuna modifica allo schema DB.
+Il blocco `EXCEPTION` ignora silenziosamente le funzioni che non esistono, così la migration è sicura anche se `fill_family_member_info` fosse già stata rimossa o avesse una signature diversa.
 
-## Domande aperte (assunzioni se non rispondi)
+## Verifica post-migration
 
-- Bucket pubblico (foto visibili senza auth) → assunto **sì**, così le foto compaiono in tutte le liste senza signed URL.
-- Una sola foto per prodotto (non galleria) → assunto **sì**.
-
-Se vuoi galleria multi-foto o bucket privato con signed URL, dimmelo e rivedo il piano.
+Dopo l'applicazione, riavviare lo scan di sicurezza: il finding dovrebbe scomparire perché `anon` non potrà più chiamare la funzione via `/rest/v1/rpc/fill_family_member_info`.
