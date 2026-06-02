@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const inputSchema = z.object({ productId: z.string().uuid() });
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/firecrawl";
+const FIRECRAWL_API_URL = "https://api.firecrawl.dev";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -26,9 +26,7 @@ export const findProductImageFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
     const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY non configurato");
     if (!FIRECRAWL_API_KEY)
       throw new Error("Connettore Firecrawl non configurato");
 
@@ -49,11 +47,10 @@ export const findProductImageFn = createServerFn({ method: "POST" })
       throw new Error("Descrizione prodotto insufficiente per la ricerca");
 
     // 3. Call Firecrawl image search via gateway
-    const searchRes = await fetch(`${GATEWAY_URL}/v2/search`, {
+    const searchRes = await fetch(`${FIRECRAWL_API_URL}/v2/search`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": FIRECRAWL_API_KEY,
+        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
