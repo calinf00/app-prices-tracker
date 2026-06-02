@@ -344,8 +344,9 @@ function ScanPage() {
             if (retry?.[0]?.id) {
               productId = retry[0].id;
             } else {
+              console.error("[scan.save] product insert error", pErr);
               throw new Error(
-                `Impossibile salvare il prodotto "${cleanName}": ${pErr.message}`,
+                `Impossibile salvare il prodotto "${cleanName}"`,
               );
             }
           } else {
@@ -382,7 +383,7 @@ function ScanPage() {
         if (puErr) {
           console.error("[scan.save] purchase insert error", puErr);
           throw new Error(
-            `Impossibile salvare l'acquisto "${cleanName}": ${puErr.message}`,
+            `Impossibile salvare l'acquisto "${cleanName}"`,
           );
         }
       }
@@ -419,12 +420,7 @@ function ScanPage() {
       }
     } catch (e: any) {
       console.error("[scan.save] failed", e);
-      // Surface the real underlying message: these errors are app-controlled
-      // (we construct them above) and crucial for the user to fix the input.
-      const msg = typeof e?.message === "string" && e.message
-        ? e.message
-        : "Errore salvataggio";
-      toast.error(msg);
+      toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
     }

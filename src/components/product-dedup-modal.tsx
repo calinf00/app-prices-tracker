@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Check, X, Ban, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { toUserMessage } from "@/lib/user-errors";
 import type { SimilarityCandidate } from "@/lib/product-similarity.functions";
 import {
   mergeProductsFn,
@@ -49,7 +50,7 @@ export function ProductDedupModal({ open, pairs, onResolved, onClose }: Props) {
       setDecisions((d) => ({ ...d, [p.newProductId]: "merged" }));
       toast.success(`Unito con "${p.existingProductName}"`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore unione");
+      toast.error(toUserMessage(e, "Errore unione"));
     } finally {
       setPending(null);
     }
@@ -68,7 +69,7 @@ export function ProductDedupModal({ open, pairs, onResolved, onClose }: Props) {
       setDecisions((d) => ({ ...d, [p.newProductId]: "dismissed" }));
       toast.success("Non chiederò più per questo prodotto");
     } catch (e: any) {
-      toast.error(e?.message ?? "Errore");
+      toast.error(toUserMessage(e, "Errore"));
     } finally {
       setPending(null);
     }
