@@ -1,28 +1,54 @@
-## Problema 1 — Errore caricamento foto
+# Cerca foto del prodotto su internet con IA
 
-Il log mostra `StorageApiError: new row violates row-level security policy` quando si carica una foto sul bucket `product-images`. Cause possibili:
+## Obiettivo
+Aggiungere un terzo tasto "Cerca con IA" accanto a Carica/Rimuovi nella pagina dettaglio prodotto. Quando premuto, il sistema cerca su internet una foto reale del prodotto in base a nome + brand + categoria, la scarica e la imposta come immagine del prodotto.
 
-1. La migration `20260602161405_product_images_bucket.sql` (che crea il bucket e le policy RLS su `storage.objects`) **non è ancora stata applicata** al database di produzione (creata via file ma mai pushata).
-2. Oppure il bucket esiste ma le policy non sono state create.
+## Approccio
+Usiamo **Firecrawl** (connettore Lovable) per:
+1. Fare una `search` web della query "<brand> <nome prodotto> <categoria> product photo" con `scrapeOptions` per estrarre immagini.
+2. Selezionare la prima immagine valida tra i risultati (filtrando per dimensione/formato).
+3. Scaricarla lato server, caricarla nel bucket `product-images` di Storage (cartella utente), aggiornare `products.image_url`.
 
-Il codice client è corretto: carica su `${uid}/${id}-${ts}.jpg`, e la policy richiede `auth.uid()::text = (storage.foldername(name))[1]` → combacia.
+In alternativa, se la ricerca non restituisce risultati utili, l'IA (Lovable AI Gateway con `google/gemini-3-flash-preview`) può ri-formulare la query e ritentare una volta. Niente generazione di immagini sintetiche — l'utente ha chiesto foto reali dal web.
 
-### Cosa fare
-- Chiederti di applicare la migration `20260602161405_product_images_bucket.sql` su Supabase (SQL Editor o `supabase db push`).
-- Se il bucket esiste già ma senza policy, lo script è idempotente sul bucket (`on conflict do nothing`) ma le `create policy` falliranno se già presenti. In quel caso creiamo una nuova migration che usa `drop policy if exists` prima di ricrearle, per garantire l'allineamento.
+## Setup richiesto
+- Collegare il connettore **Firecrawl** alla workspace (tool `standard_connectors--connect`). L'utente verrà invitato a fare login/creare l'account.
+- `LOVABLE_API_KEY` (già presente per il gateway).
 
-## Problema 2 — Pulsante "Rimuovi foto"
+## File da modificare/creare
 
-In realtà nel codice esiste già: `src/routes/_authenticated/products.$id.tsx` riga 333-342 mostra un pulsante testuale "✕ Rimuovi foto" sotto al nome del prodotto, visibile solo quando `image_url` è presente. È poco visibile (testo grigio piccolo 11px).
+### 1. Nuovo: `src/lib/product-image-search.functions.ts`
+Server function `findProductImageFn`:
+- Input: `{ productId: string }`
+- Carica il prodotto (con auth middleware), costruisce la query
+- Chiama Firecrawl search via gateway (`https://connector-gateway.lovable.dev/firecrawl/v2/search`)
+- (Opzionale) chiede al Lovable AI Gateway di scegliere il miglior URL tra i top 5 risultati
+- `fetch()` dell'immagine, controlla `content-type` (image/jpeg|png|webp) e dimensione < 5MB
+- Upload nel bucket `product-images` come `${userId}/${productId}-ai-${ts}.jpg` (usando il client autenticato così le RLS passano)
+- `UPDATE products SET image_url = <publicUrl> WHERE id = ...`
+- Ritorna `{ imageUrl }`
 
-### Cosa fare
-Rendere il pulsante più evidente:
-- Sostituire il piccolo link testuale con un vero `Button` `variant="ghost"` `size="sm"` con icona cestino + label "Rimuovi foto", colore `text-destructive`.
-- Confermare l'azione con un `AlertDialog` (Sei sicuro di voler rimuovere la foto?) per evitare cancellazioni accidentali.
+### 2. `src/routes/_authenticated/products.$id.tsx`
+- Aggiungere import del nuovo server fn + icona (`Sparkles` da lucide-react)
+- Aggiungere stato `searchingImage`
+- Handler `searchWithAI()` che invoca `findProductImageFn`, mostra toast successo/errore, e fa `queryClient.invalidateQueries` per ricaricare i dati prodotto
+- Aggiungere terzo `Button` "Cerca con IA" accanto al tasto "Rimuovi foto" (visibile sempre, disabilitato durante operazioni)
 
-## File toccati
-- `src/routes/_authenticated/products.$id.tsx` — sostituire il bottone rimuovi con versione più visibile + dialog di conferma.
-- (Eventuale) nuova migration `supabase/migrations/<ts>_product_images_policies_idempotent.sql` solo se confermi che la migration precedente è stata già applicata parzialmente.
+### 3. Layout tasti
+Riorganizzare la riga azioni foto in un piccolo gruppo `flex gap-2 flex-wrap`:
+- 📷 Carica (già esistente, sull'avatar)
+- ✨ Cerca con IA (nuovo)
+- 🗑 Rimuovi (esistente, solo se `image_url` presente)
 
-## Domanda
-Hai già applicato la migration `20260602161405_product_images_bucket.sql` su Supabase? (Senza quella, l'upload non può funzionare.)
+## Gestione errori
+- Firecrawl 402 (crediti finiti) → toast "Crediti Firecrawl esauriti, ricarica nella workspace"
+- Nessuna immagine trovata → toast "Nessuna foto trovata, prova a caricare manualmente"
+- Errore download/upload → toast con messaggio chiaro
+
+## Non incluso
+- Scelta tra più candidati (verrà presa la prima immagine valida; possibile miglioramento futuro con modale di scelta)
+- Generazione AI di immagini sintetiche (esplicitamente esclusa)
+- Cache risultati: ogni click rifa la ricerca
+
+## Conferme necessarie
+Procedo con la connessione Firecrawl in fase di build?
