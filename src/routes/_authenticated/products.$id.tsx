@@ -359,15 +359,31 @@ function ProductDetailPage() {
           <p className="text-xs text-muted-foreground truncate">
             {[p.brand, p.category].filter(Boolean).join(" · ") || "—"}
           </p>
-          {p.image_url && (
-            <AlertDialog>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={uploadingImage || searchingImage}
+              onClick={searchImageWithAI}
+              className="h-7 px-2 text-xs"
+            >
+              {searchingImage ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 mr-1" />
+              )}
+              Cerca con IA
+            </Button>
+            {p.image_url && (
+              <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={uploadingImage}
-                  className="mt-1 h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    disabled={uploadingImage || searchingImage}
+                    className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1" /> Rimuovi foto
                 </Button>
@@ -389,8 +405,9 @@ function ProductDetailPage() {
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
-            </AlertDialog>
-          )}
+              </AlertDialog>
+            )}
+          </div>
         </div>
         <Button
           size="sm"
