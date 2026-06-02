@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Trash2, Save, Camera, Loader2, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Pencil, Plus, Trash2, Save, Camera, Loader2, Sparkles, ZoomIn } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,6 +94,8 @@ function ProductDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [searchingImage, setSearchingImage] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const findProductImage = useServerFn(findProductImageFn);
 
   const { data, isLoading } = useQuery({
@@ -330,36 +332,62 @@ function ProductDetailPage() {
       </Link>
 
       <Card className="p-5 flex gap-4 items-center">
-        <label
-          className={`relative group h-16 w-16 rounded-lg overflow-hidden grid place-items-center shrink-0 cursor-pointer ${meta.className}`}
-          aria-label={p.image_url ? "Cambia foto" : "Aggiungi foto"}
-        >
-          {p.image_url ? (
+        {p.image_url ? (
+          <div
+            className={`relative group h-16 w-16 rounded-lg overflow-hidden grid place-items-center shrink-0 cursor-pointer ${meta.className}`}
+            onClick={() => setImageOpen(true)}
+            title="Clicca per ingrandire"
+          >
             <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
-          ) : (
-            <Icon className="h-7 w-7" />
-          )}
-          <div className="absolute inset-0 bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition grid place-items-center">
-            {uploadingImage ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Camera className="h-5 w-5" />
-            )}
+            <div className="absolute inset-0 bg-black/55 text-white opacity-0 group-hover:opacity-100 transition grid place-items-center">
+              <ZoomIn className="h-5 w-5" />
+            </div>
           </div>
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={onPickFile}
-            disabled={uploadingImage}
-          />
-        </label>
+        ) : (
+          <label
+            className={`relative group h-16 w-16 rounded-lg overflow-hidden grid place-items-center shrink-0 cursor-pointer ${meta.className}`}
+            aria-label="Aggiungi foto"
+          >
+            <Icon className="h-7 w-7" />
+            <div className="absolute inset-0 bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition grid place-items-center">
+              {uploadingImage ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Camera className="h-5 w-5" />
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={onPickFile}
+              disabled={uploadingImage}
+            />
+          </label>
+        )}
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold truncate">{p.name}</h2>
           <p className="text-xs text-muted-foreground truncate">
             {[p.brand, p.category].filter(Boolean).join(" · ") || "—"}
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={uploadingImage || searchingImage}
+              onClick={() => fileInputRef.current?.click()}
+              className="h-7 px-2 text-xs"
+            >
+              <Camera className="h-3.5 w-3.5 mr-1" /> Carica
+            </Button>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              ref={fileInputRef}
+              onChange={onPickFile}
+            />
             <Button
               type="button"
               variant="ghost"
