@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toUserMessage } from "@/lib/user-errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Trash2, Save } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, Save, Camera, Loader2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, CATEGORIES, STORE_COLORS, UNITS } from "@/lib/categories";
 import { calcUnitPrices } from "@/lib/unit-conversion";
 import { UnitPriceFields } from "./products.new";
+import { compressImage } from "@/lib/image-compress";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   component: ProductDetailPage,
@@ -78,6 +79,7 @@ function ProductDetailPage() {
   const [adding, setAdding] = useState(false);
   const [editProductOpen, setEditProductOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -145,6 +147,80 @@ function ProductDetailPage() {
     },
     onError: (e: any) => toast.error(toUserMessage(e, "Errore eliminazione")),
   });
+
+  // Try to delete the previous image from storage if it lives in the
+  // current user's folder of the product-images bucket. Best-effort only:
+  // failure to clean up is logged, never surfaced.
+  const cleanupOldImage = async (oldUrl: string | null | undefined) => {
+    if (!oldUrl) return;
+    const marker = "/storage/v1/object/public/product-images/";
+    const idx = oldUrl.indexOf(marker);
+    if (idx < 0) return;
+    const path = oldUrl.slice(idx + marker.length);
+    const { error } = await supabase.storage.from("product-images").remove([path]);
+    if (error) console.warn("[product.image] cleanup failed", error);
+  };
+
+  const uploadImage = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user) throw new Error("Sessione scaduta, accedi di nuovo.");
+      const uid = userData.user.id;
+      const compressed = await compressImage(file, 1200, 0.85, 500 * 1024);
+      const path = `${uid}/${id}-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("product-images")
+        .upload(path, compressed, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("product-images").getPublicUrl(path);
+      const publicUrl = pub.publicUrl;
+      const { error: updErr } = await supabase
+        .from("products")
+        .update({ image_url: publicUrl })
+        .eq("id", id)
+        .select("id");
+      if (updErr) throw updErr;
+      await cleanupOldImage(data?.product.image_url ?? null);
+      toast.success("Foto aggiornata");
+      qc.invalidateQueries({ queryKey: ["product", id] });
+      qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+    } catch (e: any) {
+      toast.error(toUserMessage(e, "Errore caricamento foto"));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = async () => {
+    setUploadingImage(true);
+    try {
+      const oldUrl = data?.product.image_url ?? null;
+      const { error } = await supabase
+        .from("products")
+        .update({ image_url: null })
+        .eq("id", id)
+        .select("id");
+      if (error) throw error;
+      await cleanupOldImage(oldUrl);
+      toast.success("Foto rimossa");
+      qc.invalidateQueries({ queryKey: ["product", id] });
+      qc.invalidateQueries({ queryKey: ["products-with-purchases"] });
+    } catch (e: any) {
+      toast.error(toUserMessage(e, "Errore rimozione foto"));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) uploadImage(file);
+  };
 
   const stats = useMemo(() => {
     const list = data?.purchases ?? [];
@@ -225,18 +301,45 @@ function ProductDetailPage() {
       </Link>
 
       <Card className="p-5 flex gap-4 items-center">
-        <div className={`h-16 w-16 rounded-lg overflow-hidden grid place-items-center shrink-0 ${meta.className}`}>
+        <label
+          className={`relative group h-16 w-16 rounded-lg overflow-hidden grid place-items-center shrink-0 cursor-pointer ${meta.className}`}
+          aria-label={p.image_url ? "Cambia foto" : "Aggiungi foto"}
+        >
           {p.image_url ? (
             <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
           ) : (
             <Icon className="h-7 w-7" />
           )}
-        </div>
+          <div className="absolute inset-0 bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition grid place-items-center">
+            {uploadingImage ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Camera className="h-5 w-5" />
+            )}
+          </div>
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={onPickFile}
+            disabled={uploadingImage}
+          />
+        </label>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold truncate">{p.name}</h2>
           <p className="text-xs text-muted-foreground truncate">
             {[p.brand, p.category].filter(Boolean).join(" · ") || "—"}
           </p>
+          {p.image_url && (
+            <button
+              type="button"
+              onClick={removeImage}
+              disabled={uploadingImage}
+              className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
+            >
+              <X className="h-3 w-3" /> Rimuovi foto
+            </button>
+          )}
         </div>
         <Button
           size="sm"
