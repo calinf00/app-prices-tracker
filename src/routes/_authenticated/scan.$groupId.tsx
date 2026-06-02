@@ -490,7 +490,7 @@ function PurchaseEditDialog({
       onSaved(purchase.product_id);
     } catch (e: any) {
       console.error("[scan.receipt.edit] save failed", e);
-      toast.error(e?.message || "Errore salvataggio");
+      toast.error(toUserMessage(e, "Errore salvataggio"));
     } finally {
       setSaving(false);
     }
